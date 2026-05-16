@@ -13,11 +13,29 @@ const Router = () => {
 function App() {
   return (
     <NavigationProvider>
-      <MainLayout>
-        <Router />
-      </MainLayout>
+      <ContentWrapper />
     </NavigationProvider>
   );
 }
+
+const ContentWrapper = () => {
+  const { page } = useNavigation();
+
+  // 👉 Se estiver na Home, NÃO mostra sidebar
+  if (page === "home") {
+    return (
+      <div style={{ background: "#000", minHeight: "100vh" }}>
+        <HomePage />
+      </div>
+    );
+  }
+
+  // 👉 Em todas as outras páginas, usa o layout com sidebar
+  return (
+    <MainLayout>
+      <Router />
+    </MainLayout>
+  );
+};
 
 export default App;
