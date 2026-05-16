@@ -4,7 +4,8 @@ type Page =
   | "home"
   | "dashboard"
   | "portfolio"
-  | "trades"; // ⭐ ADICIONADO
+  | "trades"
+  | "market"; // ⭐ ADICIONADO
 
 type NavContextType = {
   page: Page;
@@ -25,7 +26,6 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
   );
 };
 
-// ⭐ ESTE HOOK É O QUE FALTAVA
 export const useNavigation = () => {
   const ctx = useContext(NavContext);
   if (!ctx) throw new Error("useNavigation must be inside NavigationProvider");

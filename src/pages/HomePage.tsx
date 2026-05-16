@@ -1,33 +1,48 @@
 import { useNavigation } from "../context/NavigationContext";
 import { useEffect, useState } from "react";
 
+import { useBitcoinData } from "../hooks/useBitcoinData";
+import { useOnChainData } from "../hooks/useOnChainData";
+import { useFearGreed } from "../hooks/useFearGreed";
+import { useBTCDominance } from "../hooks/useBTCDominance";
+import { useMarketIntelligence } from "../engine/useMarketIntelligence";
+
 export const HomePage = () => {
   const { navigate } = useNavigation();
 
-  /* FRASES NEUTRAS DO MERCADO (SEM ANÁLISE) */
-  const marketMessages = [
-    "O mercado mantém um ritmo calmo e equilibrado.",
-    "Bitcoin segue estável, com variações suaves no curto prazo.",
-    "O mercado apresenta um comportamento tranquilo no momento.",
-    "Movimentos moderados marcam o ritmo atual do mercado.",
-    "O ambiente de mercado permanece sereno e consistente.",
-  ];
+  const market = useBitcoinData();
+  const onchain = useOnChainData();
+  const fearGreed = useFearGreed();
+  const dominance = useBTCDominance();
+  const intel = useMarketIntelligence(market, onchain, fearGreed, dominance);
 
-  const [marketText, setMarketText] = useState("");
+  const [marketText, setMarketText] = useState("A analisar mercado…");
 
   useEffect(() => {
     document.body.style.background =
       "radial-gradient(circle at top, #181818 0%, #0a0a0a 45%, #000 100%)";
 
-    const random =
-      marketMessages[Math.floor(Math.random() * marketMessages.length)];
+    if (!intel || !market || !onchain) return;
 
-    setMarketText(random);
+    let text = "";
+
+    // FRASES CURTAS, PROFISSIONAIS, SEM BULLETS E SEM PONTOS FINAIS
+    if (intel.riskScore > 75) text = "O mercado está tenso e exige cautela";
+    else if (intel.opportunityScore > 70) text = "O mercado oferece uma oportunidade interessante";
+    else if ((fearGreed ?? 50) < 30) text = "O mercado está em modo de medo e desconto";
+    else if ((fearGreed ?? 50) > 70) text = "O mercado está esticado e com excesso de confiança";
+
+    else if (onchain.mempoolTxCount && onchain.mempoolTxCount > 200000)
+      text = "A rede está congestionada e com custos elevados";
+    else if (market.volatility24h > 8) text = "A volatilidade está elevada no curto prazo";
+    else text = "O mercado mantém um comportamento equilibrado";
+
+    setMarketText(text);
 
     return () => {
       document.body.style.background = "#000";
     };
-  }, []);
+  }, [intel, market, onchain, fearGreed]);
 
   return (
     <>
@@ -37,13 +52,13 @@ export const HomePage = () => {
       <div style={noiseOverlay} />
 
       <div style={container}>
-        {/* LOGO PREMIUM — SEM TÍTULO */}
+        {/* LOGO PREMIUM */}
         <div style={logoWrapper}>
           <div style={logoAura} />
           <div style={logo}>₿</div>
         </div>
 
-        {/* MARKET STATUS (NEUTRO) */}
+        {/* FRASE DINÂMICA DO MERCADO */}
         <p style={subtitle}>{marketText}</p>
 
         {/* NAVIGATION BUTTONS */}
@@ -51,6 +66,7 @@ export const HomePage = () => {
           {premiumButton("Dashboard", () => navigate("dashboard"))}
           {premiumButton("Portfolio", () => navigate("portfolio"))}
           {premiumButton("Trades", () => navigate("trades"))}
+          {premiumButton("Mercado", () => navigate("market"))}
         </div>
 
         {/* MAIN BUTTON */}
@@ -258,4 +274,4 @@ const footer: React.CSSProperties = {
   letterSpacing: 1,
   marginTop: 28,
 };
-                                                                            
+                                                                                      

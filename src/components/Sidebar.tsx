@@ -5,9 +5,9 @@ export const Sidebar = () => {
 
   const hidden = page === "home";
 
-  const menuItem = (label: string, target: string) => (
+  const menuItem = (label: string, target: any) => (
     <div
-      onClick={() => navigate(target as any)}
+      onClick={() => navigate(target)}
       style={{
         padding: "14px 20px",
         cursor: "pointer",
@@ -26,7 +26,7 @@ export const Sidebar = () => {
   return (
     <div
       style={{
-        position: "fixed",      // ⭐ FIXO
+        position: "fixed",
         top: 0,
         left: 0,
         bottom: 0,
@@ -37,7 +37,7 @@ export const Sidebar = () => {
         padding: hidden ? 0 : 20,
         boxSizing: "border-box",
         transition: "0.25s ease",
-        zIndex: 1000,           // ⭐ SEMPRE POR CIMA
+        zIndex: 1000,
       }}
     >
       {!hidden && (
@@ -57,6 +57,7 @@ export const Sidebar = () => {
           {menuItem("Dashboard", "dashboard")}
           {menuItem("Portfolio", "portfolio")}
           {menuItem("Trades", "trades")}
+          {menuItem("Mercado", "market")} {/* ⭐ ADICIONADO */}
         </>
       )}
     </div>

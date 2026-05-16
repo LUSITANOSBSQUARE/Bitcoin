@@ -5,6 +5,7 @@ import { HomePage } from "../pages/HomePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PortfolioPage } from "../pages/PortfolioPage";
 import { TradesPage } from "../pages/TradesPage";
+import { MarketPage } from "../pages/MarketPage"; // ⭐ IMPORTANTE
 
 export const MainLayout = () => {
   const { page } = useNavigation();
@@ -19,6 +20,8 @@ export const MainLayout = () => {
         return <PortfolioPage />;
       case "trades":
         return <TradesPage />;
+      case "market":               // ⭐ AQUI ESTÁ O QUE FALTAVA
+        return <MarketPage />;
       default:
         return <HomePage />;
     }
@@ -42,7 +45,7 @@ export const MainLayout = () => {
         style={{
           flex: 1,
           padding: 30,
-          marginLeft: sidebarWidth, // ⭐ CORREÇÃO CRÍTICA
+          marginLeft: sidebarWidth,
           transition: "0.25s ease",
         }}
       >
@@ -51,4 +54,4 @@ export const MainLayout = () => {
     </div>
   );
 };
-                                                                                              
+                                                                                         
