@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+
+    "save": "git add . && git commit -m \"auto-save\" && git push"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
