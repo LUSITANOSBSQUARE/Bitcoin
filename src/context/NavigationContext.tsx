@@ -1,13 +1,17 @@
 import { createContext, useContext, useState } from "react";
 
-type Page = "home" | "dashboard" | "portfolio";
+type Page =
+  | "home"
+  | "dashboard"
+  | "portfolio"
+  | "trades"; // ⭐ ADICIONADO
 
-interface NavigationContextType {
+type NavContextType = {
   page: Page;
   navigate: (p: Page) => void;
-}
+};
 
-const NavigationContext = createContext<NavigationContextType | null>(null);
+const NavContext = createContext<NavContextType | null>(null);
 
 export const NavigationProvider = ({ children }: { children: React.ReactNode }) => {
   const [page, setPage] = useState<Page>("home");
@@ -15,14 +19,15 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
   const navigate = (p: Page) => setPage(p);
 
   return (
-    <NavigationContext.Provider value={{ page, navigate }}>
+    <NavContext.Provider value={{ page, navigate }}>
       {children}
-    </NavigationContext.Provider>
+    </NavContext.Provider>
   );
 };
 
+// ⭐ ESTE HOOK É O QUE FALTAVA
 export const useNavigation = () => {
-  const ctx = useContext(NavigationContext);
-  if (!ctx) throw new Error("useNavigation must be used inside NavigationProvider");
+  const ctx = useContext(NavContext);
+  if (!ctx) throw new Error("useNavigation must be inside NavigationProvider");
   return ctx;
 };

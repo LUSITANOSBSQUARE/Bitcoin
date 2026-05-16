@@ -3,7 +3,7 @@ import { useNavigation } from "../context/NavigationContext";
 export const Sidebar = () => {
   const { page, navigate } = useNavigation();
 
-  const hidden = page === "home"; // ⭐ Sidebar escondido na Home
+  const hidden = page === "home";
 
   const menuItem = (label: string, target: string) => (
     <div
@@ -26,14 +26,18 @@ export const Sidebar = () => {
   return (
     <div
       style={{
-        width: hidden ? 0 : 220,   // ⭐ Sidebar continua no layout
-        overflow: "hidden",        // ⭐ Mas fica invisível
+        position: "fixed",      // ⭐ FIXO
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: hidden ? 0 : 220,
+        overflow: "hidden",
         background: "#000",
         borderRight: hidden ? "none" : "1px solid #111",
-        height: "100vh",
         padding: hidden ? 0 : 20,
         boxSizing: "border-box",
-        transition: "0.25s ease",  // ⭐ Transição suave
+        transition: "0.25s ease",
+        zIndex: 1000,           // ⭐ SEMPRE POR CIMA
       }}
     >
       {!hidden && (
@@ -52,6 +56,7 @@ export const Sidebar = () => {
           {menuItem("Home", "home")}
           {menuItem("Dashboard", "dashboard")}
           {menuItem("Portfolio", "portfolio")}
+          {menuItem("Trades", "trades")}
         </>
       )}
     </div>

@@ -1,5 +1,3 @@
-import React from "react";
-
 export const ConfirmDeleteModal = ({
   onClose,
   onConfirm,
@@ -12,7 +10,7 @@ export const ConfirmDeleteModal = ({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.65)",
+        background: "rgba(0,0,0,0.6)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -28,9 +26,10 @@ export const ConfirmDeleteModal = ({
           border: "1px solid #222",
         }}
       >
-        <h2 style={{ color: "#fff", marginBottom: 20 }}>Remover Transação</h2>
-        <p style={{ color: "#aaa", marginBottom: 25 }}>
-          Tens a certeza que queres remover esta transação?
+        <h2 style={{ color: "#fff", marginBottom: 20 }}>Confirmar remoção</h2>
+
+        <p style={{ color: "#aaa", marginBottom: 30 }}>
+          Tens a certeza que queres remover este item?
         </p>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -43,7 +42,6 @@ export const ConfirmDeleteModal = ({
               border: "1px solid #333",
               borderRadius: 8,
               color: "#fff",
-              cursor: "pointer",
             }}
           >
             Cancelar
@@ -59,7 +57,6 @@ export const ConfirmDeleteModal = ({
               borderRadius: 8,
               color: "#fff",
               fontWeight: "bold",
-              cursor: "pointer",
             }}
           >
             Remover

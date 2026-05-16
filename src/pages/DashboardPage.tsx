@@ -8,7 +8,7 @@ export const DashboardPage = () => {
   const { history, timestamps } = useBitcoinHistory();
 
   return (
-    <>
+    <div style={{ padding: 40, color: "#fff", fontFamily: "Inter, sans-serif" }}>
       <h1 style={{ fontSize: 36, marginBottom: 10 }}>Dashboard Bitcoin</h1>
 
       <p style={{ color: "#aaa", marginBottom: 40 }}>
@@ -30,6 +30,6 @@ export const DashboardPage = () => {
           <BitcoinChart labels={timestamps} data={history} />
         </>
       )}
-    </>
+    </div>
   );
 };
