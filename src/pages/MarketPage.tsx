@@ -15,12 +15,26 @@ export const MarketPage = () => {
   const loading =
     !market || !onchain || fearGreed == null || dominance == null || !intel;
 
+  /* ---------------- LOADING STATE (PREMIUM) ---------------- */
   if (loading) {
     return (
-      <div style={{ padding: 32, color: "#fff" }}>A analisar mercado…</div>
+      <div style={styles.loadingWrapper}>
+        <div style={styles.spinner} />
+        <div style={styles.loadingText}>A analisar o mercado em tempo real</div>
+
+        {/* SPINNER ANIMATION */}
+        <style>
+          {`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}
+        </style>
+      </div>
     );
   }
 
+  /* ---------------- PAGE CONTENT ---------------- */
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>Market Intelligence</h1>
@@ -84,9 +98,9 @@ export const MarketPage = () => {
         <div style={styles.cleanList}>
           <div style={styles.item}>
             Sentimento:{" "}
-            {fearGreed < 30
+            {(fearGreed ?? 50) < 30
               ? "Medo"
-              : fearGreed < 70
+              : (fearGreed ?? 50) < 70
               ? "Neutro"
               : "Ganância"}
           </div>
@@ -156,6 +170,7 @@ export const MarketPage = () => {
 /* --- STYLES --- */
 
 const styles: Record<string, React.CSSProperties> = {
+  /* PAGE */
   page: {
     color: "#fff",
     fontFamily: "Inter, system-ui, sans-serif",
@@ -163,11 +178,14 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 900,
     margin: "0 auto",
   },
+
   title: {
     fontSize: 28,
     marginBottom: 20,
     fontWeight: 600,
   },
+
+  /* CARDS */
   card: {
     background: "#0b0b0b",
     border: "1px solid #1f1f1f",
@@ -175,45 +193,80 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     marginBottom: 20,
   },
+
   label: {
     fontSize: 14,
     color: "#aaa",
     marginBottom: 8,
   },
+
   score: {
     fontSize: 40,
     fontWeight: 700,
   },
+
   sub: {
     fontSize: 14,
     color: "#aaa",
     marginTop: 4,
   },
+
   action: {
     fontSize: 28,
     fontWeight: 700,
     marginTop: 6,
   },
+
   separator: {
     borderTop: "1px solid #f7931a55",
     margin: "16px 0",
   },
+
   cleanList: {
     display: "flex",
     flexDirection: "column",
     gap: 6,
   },
+
   item: {
     color: "#ddd",
     fontSize: 14,
   },
+
   strong: {
     color: "#22c55e",
     fontSize: 14,
   },
+
   summary: {
     fontSize: 14,
     color: "#ddd",
     lineHeight: 1.5,
+  },
+
+  /* LOADING */
+  loadingWrapper: {
+    height: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 20,
+    color: "#fff",
+    fontFamily: "Inter, system-ui, sans-serif",
+  },
+
+  spinner: {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    border: "4px solid rgba(255,255,255,0.1)",
+    borderTopColor: "#f7931a",
+    animation: "spin 0.8s linear infinite",
+  },
+
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.8,
   },
 };

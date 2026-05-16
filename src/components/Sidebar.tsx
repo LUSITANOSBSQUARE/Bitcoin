@@ -55,9 +55,11 @@ export const Sidebar = () => {
 
           {menuItem("Home", "home")}
           {menuItem("Dashboard", "dashboard")}
+          {menuItem("Mercado", "market")}
           {menuItem("Portfolio", "portfolio")}
+          {menuItem("Capital", "capital")}   {/* ⭐ NOVO */}
           {menuItem("Trades", "trades")}
-          {menuItem("Mercado", "market")} {/* ⭐ ADICIONADO */}
+          {menuItem("Copilot", "tradecopilot")} 
         </>
       )}
     </div>

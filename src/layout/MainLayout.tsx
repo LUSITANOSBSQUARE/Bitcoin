@@ -5,7 +5,9 @@ import { HomePage } from "../pages/HomePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PortfolioPage } from "../pages/PortfolioPage";
 import { TradesPage } from "../pages/TradesPage";
-import { MarketPage } from "../pages/MarketPage"; // ⭐ IMPORTANTE
+import { MarketPage } from "../pages/MarketPage";
+import { CapitalControlPage } from "../pages/CapitalControlPage";
+import { TradeCopilotPage } from "../pages/TradeCopilotPage"; // ⭐ NOVO
 
 export const MainLayout = () => {
   const { page } = useNavigation();
@@ -14,14 +16,25 @@ export const MainLayout = () => {
     switch (page) {
       case "home":
         return <HomePage />;
+
       case "dashboard":
         return <DashboardPage />;
+
       case "portfolio":
         return <PortfolioPage />;
+
+      case "capital":
+        return <CapitalControlPage />;
+
       case "trades":
         return <TradesPage />;
-      case "market":               // ⭐ AQUI ESTÁ O QUE FALTAVA
+
+      case "market":
         return <MarketPage />;
+
+      case "tradecopilot": // ⭐ NOVO
+        return <TradeCopilotPage />;
+
       default:
         return <HomePage />;
     }
@@ -54,4 +67,4 @@ export const MainLayout = () => {
     </div>
   );
 };
-                                                                                         
+                                                                               

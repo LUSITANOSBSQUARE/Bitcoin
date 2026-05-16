@@ -26,12 +26,10 @@ export const HomePage = () => {
 
     let text = "";
 
-    // FRASES CURTAS, PROFISSIONAIS, SEM BULLETS E SEM PONTOS FINAIS
     if (intel.riskScore > 75) text = "O mercado está tenso e exige cautela";
     else if (intel.opportunityScore > 70) text = "O mercado oferece uma oportunidade interessante";
     else if ((fearGreed ?? 50) < 30) text = "O mercado está em modo de medo e desconto";
     else if ((fearGreed ?? 50) > 70) text = "O mercado está esticado e com excesso de confiança";
-
     else if (onchain.mempoolTxCount && onchain.mempoolTxCount > 200000)
       text = "A rede está congestionada e com custos elevados";
     else if (market.volatility24h > 8) text = "A volatilidade está elevada no curto prazo";
@@ -46,30 +44,28 @@ export const HomePage = () => {
 
   return (
     <>
-      {/* BACKGROUND FX */}
       <div style={backgroundGlow} />
       <div style={backgroundGrid} />
       <div style={noiseOverlay} />
 
       <div style={container}>
-        {/* LOGO PREMIUM */}
         <div style={logoWrapper}>
           <div style={logoAura} />
           <div style={logo}>₿</div>
         </div>
 
-        {/* FRASE DINÂMICA DO MERCADO */}
         <p style={subtitle}>{marketText}</p>
 
-        {/* NAVIGATION BUTTONS */}
+        {/* ⭐ NAVIGATION BUTTONS (COM CAPITAL + COPILOT) */}
         <div style={buttonRow}>
           {premiumButton("Dashboard", () => navigate("dashboard"))}
           {premiumButton("Portfolio", () => navigate("portfolio"))}
+          {premiumButton("Capital", () => navigate("capital"))}
           {premiumButton("Trades", () => navigate("trades"))}
           {premiumButton("Mercado", () => navigate("market"))}
+          {premiumButton("Copilot", () => navigate("tradecopilot"))} {/* ⭐ NOVO */}
         </div>
 
-        {/* MAIN BUTTON */}
         <button
           onClick={() => navigate("dashboard")}
           style={mainButton}
@@ -87,11 +83,9 @@ export const HomePage = () => {
           Entrar
         </button>
 
-        {/* FOOTER */}
         <p style={footer}>Powered by BTC Engine</p>
       </div>
 
-      {/* ANIMATIONS */}
       <style>
         {`
           @keyframes float {
@@ -274,4 +268,4 @@ const footer: React.CSSProperties = {
   letterSpacing: 1,
   marginTop: 28,
 };
-                                                                                      
+                                                                    
