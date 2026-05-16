@@ -1,24 +1,41 @@
 export const MetricCard = ({
   label,
   value,
-  color = "#f7931a",
 }: {
   label: string;
   value: string | number;
-  color?: string;
 }) => {
   return (
     <div
       style={{
-        background: "#111",
-        padding: 20,
-        borderRadius: 12,
-        border: "1px solid #222",
-        width: 220,
+        padding: "18px 20px",
+        borderRadius: 16,
+        background: "rgba(0,0,0,0.55)", // vidro premium
+        border: "1px solid rgba(247,147,26,0.35)", // borda laranja fina
+        backdropFilter: "blur(14px)",
       }}
     >
-      <p style={{ color: "#aaa", marginBottom: 8 }}>{label}</p>
-      <h2 style={{ fontSize: 26, fontWeight: "bold", color }}>{value}</h2>
+      <p
+        style={{
+          color: "rgba(255,255,255,0.55)",
+          fontSize: 13,
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </p>
+
+      <h2
+        style={{
+          fontSize: 22,
+          fontWeight: 600,
+          margin: 0,
+          color: "#fff", // números sempre brancos
+          letterSpacing: 0.3,
+        }}
+      >
+        {value}
+      </h2>
     </div>
   );
 };
