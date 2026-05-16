@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from "react";
 
-type Page = "home" | "dashboard";
+type Page = "home" | "dashboard" | "portfolio";
 
 interface NavigationContextType {
   page: Page;

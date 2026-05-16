@@ -1,41 +1,40 @@
 import { NavigationProvider, useNavigation } from "./context/NavigationContext";
+import { PortfolioProvider } from "./context/PortfolioContext";
+
 import { HomePage } from "./pages/HomePage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { PortfolioPage } from "./pages/PortfolioPage";
+
 import { MainLayout } from "./layout/MainLayout";
 
 const Router = () => {
   const { page } = useNavigation();
 
   if (page === "dashboard") return <DashboardPage />;
+  if (page === "portfolio") return <PortfolioPage />;
   return <HomePage />;
+};
+
+const ContentWrapper = () => {
+  const { page } = useNavigation();
+
+  return (
+    <MainLayout hideSidebar={page === "home"}>
+      <div key={page} style={{ width: "100%", transition: "opacity 0.2s ease" }}>
+        <Router />
+      </div>
+    </MainLayout>
+  );
 };
 
 function App() {
   return (
     <NavigationProvider>
-      <ContentWrapper />
+      <PortfolioProvider>
+        <ContentWrapper />
+      </PortfolioProvider>
     </NavigationProvider>
   );
 }
-
-const ContentWrapper = () => {
-  const { page } = useNavigation();
-
-  // 👉 Se estiver na Home, NÃO mostra sidebar
-  if (page === "home") {
-    return (
-      <div style={{ background: "#000", minHeight: "100vh" }}>
-        <HomePage />
-      </div>
-    );
-  }
-
-  // 👉 Em todas as outras páginas, usa o layout com sidebar
-  return (
-    <MainLayout>
-      <Router />
-    </MainLayout>
-  );
-};
 
 export default App;

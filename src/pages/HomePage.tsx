@@ -4,7 +4,7 @@ export const HomePage = () => {
   const { navigate } = useNavigation();
 
   return (
-    <div style={{ padding: 40, color: "#fff" }}>
+    <>
       <h1 style={{ fontSize: 36, marginBottom: 20 }}>Bem‑vindo ao BTC Engine</h1>
 
       <p style={{ color: "#aaa", marginBottom: 30 }}>
@@ -25,6 +25,6 @@ export const HomePage = () => {
       >
         Ir para Dashboard
       </button>
-    </div>
+    </>
   );
 };

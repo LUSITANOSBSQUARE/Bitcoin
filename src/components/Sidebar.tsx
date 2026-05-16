@@ -3,9 +3,11 @@ import { useNavigation } from "../context/NavigationContext";
 export const Sidebar = () => {
   const { page, navigate } = useNavigation();
 
-  const menuItem = (label: string, target: "home" | "dashboard") => (
+  const hidden = page === "home"; // ⭐ Sidebar escondido na Home
+
+  const menuItem = (label: string, target: string) => (
     <div
-      onClick={() => navigate(target)}
+      onClick={() => navigate(target as any)}
       style={{
         padding: "14px 20px",
         cursor: "pointer",
@@ -24,27 +26,34 @@ export const Sidebar = () => {
   return (
     <div
       style={{
-        width: 220,
+        width: hidden ? 0 : 220,   // ⭐ Sidebar continua no layout
+        overflow: "hidden",        // ⭐ Mas fica invisível
         background: "#000",
-        borderRight: "1px solid #111",
+        borderRight: hidden ? "none" : "1px solid #111",
         height: "100vh",
-        padding: 20,
+        padding: hidden ? 0 : 20,
         boxSizing: "border-box",
+        transition: "0.25s ease",  // ⭐ Transição suave
       }}
     >
-      <div
-        style={{
-          fontSize: 32,
-          fontWeight: "bold",
-          color: "#f7931a",
-          marginBottom: 40,
-        }}
-      >
-        ₿ Engine
-      </div>
+      {!hidden && (
+        <>
+          <div
+            style={{
+              fontSize: 32,
+              fontWeight: "bold",
+              color: "#f7931a",
+              marginBottom: 40,
+            }}
+          >
+            ₿ Engine
+          </div>
 
-      {menuItem("Home", "home")}
-      {menuItem("Dashboard", "dashboard")}
+          {menuItem("Home", "home")}
+          {menuItem("Dashboard", "dashboard")}
+          {menuItem("Portfolio", "portfolio")}
+        </>
+      )}
     </div>
   );
 };
