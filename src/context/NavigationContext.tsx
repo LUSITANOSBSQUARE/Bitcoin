@@ -4,16 +4,18 @@ import { createContext, useContext, useState } from "react";
 // 🔥 DEFINIÇÃO COMPLETA DAS PÁGINAS
 // — Inclui todas as páginas reais do teu projeto
 // — Inclui o Ledger
+// — Inclui o novo TradeControl
 //
 export type Page =
   | "home"
   | "dashboard"
   | "market"
   | "portfolio"
-  | "ledger"        // ⭐ NOVO
+  | "ledger"
   | "capital"
   | "trades"
-  | "tradecopilot";
+  | "tradecopilot"
+  | "tradecontrol";   // ⭐ ADICIONADO AQUI
 
 //
 // 🔥 TIPO DO CONTEXTO

@@ -1,35 +1,44 @@
 import React, { useEffect, useState } from "react";
-import type { TradeType } from "../context/TradesContext";
+import type { TradeType, Trade } from "../context/TradesContext";
 
 type TradeFormData = {
+  asset: string;
+  valueUSDT: number;
   entryDate: string;
   exitDate?: string;
   entryPrice: number;
   exitPrice?: number;
-  amount: number;
   type: TradeType;
+  leverage: number;
   notes?: string;
 };
 
 type Props = {
   onClose: () => void;
   onSubmit: (trade: TradeFormData) => void;
-  initial?: Partial<TradeFormData>;
+  initial?: Partial<Trade>;
 };
 
 export const TradeFormModal = ({ onClose, onSubmit, initial }: Props) => {
   const isEditing = Boolean(initial);
 
+  const [asset, setAsset] = useState(initial?.asset || "BTC");
+  const [valueUSDT, setValueUSDT] = useState(
+    initial?.valueUSDT?.toString() || ""
+  );
   const [entryDate, setEntryDate] = useState(initial?.entryDate || "");
   const [exitDate, setExitDate] = useState(initial?.exitDate || "");
-  const [entryPrice, setEntryPrice] = useState(initial?.entryPrice?.toString() || "");
-  const [exitPrice, setExitPrice] = useState(initial?.exitPrice?.toString() || "");
-  const [amount, setAmount] = useState(initial?.amount?.toString() || "");
+  const [entryPrice, setEntryPrice] = useState(
+    initial?.entryPrice?.toString() || ""
+  );
+  const [exitPrice, setExitPrice] = useState(
+    initial?.exitPrice?.toString() || ""
+  );
   const [type, setType] = useState<TradeType>(initial?.type || "long");
+  const [leverage, setLeverage] = useState(initial?.leverage || 3);
   const [notes, setNotes] = useState(initial?.notes || "");
   const [error, setError] = useState("");
 
-  // ESC fecha modal
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -41,18 +50,20 @@ export const TradeFormModal = ({ onClose, onSubmit, initial }: Props) => {
   const save = () => {
     setError("");
 
-    if (!entryDate || !entryPrice || !amount) {
+    if (!asset || !valueUSDT || !entryDate || !entryPrice) {
       setError("Preenche os campos obrigatórios.");
       return;
     }
 
     onSubmit({
+      asset: asset.toUpperCase(),
+      valueUSDT: Number(valueUSDT),
       entryDate,
       exitDate: isEditing ? exitDate || undefined : undefined,
       entryPrice: Number(entryPrice),
       exitPrice: isEditing && exitPrice ? Number(exitPrice) : undefined,
-      amount: Number(amount),
       type,
+      leverage,
       notes,
     });
 
@@ -62,37 +73,76 @@ export const TradeFormModal = ({ onClose, onSubmit, initial }: Props) => {
   return (
     <div style={overlay} onClick={onClose}>
       <div style={modal} onClick={(e) => e.stopPropagation()}>
-        {/* HEADER */}
         <div style={header}>
           <h2 style={title}>{isEditing ? "Editar Trade" : "Nova Trade"}</h2>
           <button onClick={onClose} style={closeBtn}>✕</button>
         </div>
 
-        {/* ERROR */}
         {error && <div style={errorBox}>{error}</div>}
 
-        {/* TIPO */}
+        <label style={label}>Ativo</label>
+        <input
+          style={input}
+          value={asset}
+          onChange={(e) => setAsset(e.target.value.toUpperCase())}
+        />
+
+        <label style={label}>Capital Investido (USDT)</label>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          style={input}
+          value={valueUSDT}
+          onChange={(e) => setValueUSDT(e.target.value)}
+        />
+
         <label style={label}>Tipo</label>
-        <select value={type} onChange={(e) => setType(e.target.value as TradeType)} style={input}>
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as TradeType)}
+          style={input}
+        >
           <option value="long">Long</option>
           <option value="short">Short</option>
         </select>
 
-        {/* DATA ENTRADA */}
-        <label style={label}>Data Entrada</label>
-        <input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} style={input} />
+        <label style={label}>Alavancagem</label>
+        <select
+          value={leverage}
+          onChange={(e) => setLeverage(Number(e.target.value))}
+          style={input}
+        >
+          <option value={1}>1× (sem alavancagem)</option>
+          <option value={2}>2×</option>
+          <option value={3}>3×</option>
+          <option value={5}>5×</option>
+          <option value={10}>10×</option>
+        </select>
 
-        {/* CAMPOS DE FECHO — APENAS NO MODO EDITAR */}
+        <label style={label}>Data Entrada</label>
+        <input
+          type="date"
+          value={entryDate}
+          onChange={(e) => setEntryDate(e.target.value)}
+          style={input}
+        />
+
         {isEditing && (
           <>
             <label style={label}>Data Saída</label>
-            <input type="date" value={exitDate} onChange={(e) => setExitDate(e.target.value)} style={input} />
+            <input
+              type="date"
+              value={exitDate}
+              onChange={(e) => setExitDate(e.target.value)}
+              style={input}
+            />
 
-            <label style={label}>Preço Saída</label>
+            <label style={label}>Preço Saída (USDT)</label>
             <input
               type="number"
               min="0"
-              step="0.0001"
+              step="0.01"
               value={exitPrice}
               onChange={(e) => setExitPrice(e.target.value)}
               style={input}
@@ -100,36 +150,28 @@ export const TradeFormModal = ({ onClose, onSubmit, initial }: Props) => {
           </>
         )}
 
-        {/* PREÇO ENTRADA */}
-        <label style={label}>Preço Entrada</label>
+        <label style={label}>Preço Entrada (USDT)</label>
         <input
           type="number"
           min="0"
-          step="0.0001"
+          step="0.01"
           value={entryPrice}
           onChange={(e) => setEntryPrice(e.target.value)}
           style={input}
         />
 
-        {/* QUANTIDADE */}
-        <label style={label}>Quantidade</label>
-        <input
-          type="number"
-          min="0"
-          step="0.0001"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          style={input}
+        <label style={label}>Notas</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          style={textarea}
         />
 
-        {/* NOTAS */}
-        <label style={label}>Notas</label>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={textarea} />
-
-        {/* BOTÕES */}
         <div style={footer}>
           <button onClick={onClose} style={cancelBtn}>Cancelar</button>
-          <button onClick={save} style={saveBtn}>{isEditing ? "Guardar Alterações" : "Registar Trade"}</button>
+          <button onClick={save} style={saveBtn}>
+            {isEditing ? "Guardar Alterações" : "Registar Trade"}
+          </button>
         </div>
       </div>
     </div>
@@ -239,4 +281,4 @@ const errorBox: React.CSSProperties = {
   borderRadius: 10,
   marginBottom: 16,
 };
-                                                                               
+                               

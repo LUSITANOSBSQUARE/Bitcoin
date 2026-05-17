@@ -79,7 +79,6 @@ export const useCapitalEngine = (
       dominance,
       momentumScore,
       trendStrength,
-      liquidityScore: liquidityScoreExternal,
     } = market;
 
     /* ---------------- EXPOSIÇÃO ATUAL ---------------- */

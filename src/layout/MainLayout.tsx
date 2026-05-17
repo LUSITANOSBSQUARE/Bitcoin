@@ -5,11 +5,12 @@ import { useNavigation } from "../context/NavigationContext";
 import { HomePage } from "../pages/HomePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PortfolioPage } from "../pages/PortfolioPage";
-import { LedgerPage } from "../pages/LedgerPage";          // ⭐ NOVO
+import { LedgerPage } from "../pages/LedgerPage";
 import { TradesPage } from "../pages/TradesPage";
 import { MarketPage } from "../pages/MarketPage";
 import { CapitalControlPage } from "../pages/CapitalControlPage";
 import { TradeCopilotPage } from "../pages/TradeCopilotPage";
+import { TradeControlPage } from "../pages/TradeControlPage";   // ⭐ NOVO
 
 export const MainLayout = () => {
   const { page } = useNavigation();
@@ -29,7 +30,7 @@ export const MainLayout = () => {
       case "portfolio":
         return <PortfolioPage />;
 
-      case "ledger":                     // ⭐ NOVO
+      case "ledger":
         return <LedgerPage />;
 
       case "capital":
@@ -40,6 +41,9 @@ export const MainLayout = () => {
 
       case "tradecopilot":
         return <TradeCopilotPage />;
+
+      case "tradecontrol":               // ⭐ NOVO
+        return <TradeControlPage />;
 
       default:
         return <HomePage />;
@@ -73,4 +77,4 @@ export const MainLayout = () => {
     </div>
   );
 };
-                                                                      
+                                                                  

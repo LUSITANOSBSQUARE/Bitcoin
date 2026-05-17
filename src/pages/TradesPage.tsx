@@ -1,115 +1,130 @@
-import React, { useState } from "react";
-import type { Trade } from "../context/TradesContext";
+import React, { useMemo, useState } from "react";
 import { useTrades } from "../context/TradesContext";
+import type { Trade } from "../context/TradesContext";
 import { TradeFormModal } from "../components/TradeFormModal";
+import { TradeTable } from "../components/TradeTable";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useBitcoinData } from "../hooks/useBitcoinData";
+import { useTradeCapital } from "../context/TradeCapitalContext";
+import { useNavigation } from "../context/NavigationContext";
 
 export const TradesPage = () => {
   const { trades, addTrade, editTrade, removeTrade } = useTrades();
   const market = useBitcoinData();
+  const { registerClosedTrade } = useTradeCapital();
+  const { navigate } = useNavigation();
 
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<Trade | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  /* -----------------------------------------------------
+     CÁLCULO INSTITUCIONAL DE PNL (baseado em valueUSDT)
+  ----------------------------------------------------- */
   const computePnl = (t: Trade) => {
-    const priceOut = t.exitPrice ?? market?.price;
-    if (!priceOut) return { pnl: 0, pnlPercent: 0, status: "open" };
+    const priceOut = t.exitPrice ?? market?.priceUSD;
 
-    const diff =
+    if (!priceOut) {
+      return { pnl: 0, pnlPercent: 0, status: "open" as const };
+    }
+
+    const priceDiffPercent =
       t.type === "long"
-        ? priceOut - t.entryPrice
-        : t.entryPrice - priceOut;
+        ? (priceOut - t.entryPrice) / t.entryPrice
+        : (t.entryPrice - priceOut) / t.entryPrice;
 
-    const pnl = diff * t.amount;
-    const pnlPercent = (diff / t.entryPrice) * 100;
+    const pnlPercent = priceDiffPercent * 100 * t.leverage;
+    const pnl = t.valueUSDT * priceDiffPercent * t.leverage;
 
     return {
       pnl,
       pnlPercent,
-      status: t.exitPrice ? "closed" : "open",
+      status: t.exitPrice ? ("closed" as const) : ("open" as const),
     };
   };
 
-  return (
-    <>
-      <h1 style={{ fontSize: 32, marginBottom: 20 }}>Diário de Trades</h1>
+  /* -----------------------------------------------------
+     RESUMO MENSAL (apenas para exibição)
+  ----------------------------------------------------- */
+  const summary = useMemo(() => {
+    if (trades.length === 0) {
+      return {
+        totalTrades: 0,
+        totalPnl: 0,
+        avgPnl: 0,
+        winrate: 0,
+      };
+    }
 
+    const results = trades
+      .filter((t) => t.exitPrice)
+      .map((t) => computePnl(t).pnl);
+
+    if (results.length === 0) {
+      return {
+        totalTrades: 0,
+        totalPnl: 0,
+        avgPnl: 0,
+        winrate: 0,
+      };
+    }
+
+    const wins = results.filter((x) => x > 0).length;
+
+    return {
+      totalTrades: results.length,
+      totalPnl: results.reduce((a, b) => a + b, 0),
+      avgPnl: results.reduce((a, b) => a + b, 0) / results.length,
+      winrate: (wins / results.length) * 100,
+    };
+  }, [trades, market]);
+
+  /* -----------------------------------------------------
+     RENDER
+  ----------------------------------------------------- */
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Diário de Trades</h1>
+
+      {/* BOTÃO PARA TRADE CONTROL */}
       <button
-        onClick={() => setShowAdd(true)}
-        style={{
-          padding: "12px 20px",
-          background: "#f7931a",
-          border: "none",
-          borderRadius: 8,
-          cursor: "pointer",
-          fontWeight: "bold",
-          color: "#000",
-          marginBottom: 30,
-        }}
+        style={styles.controlButton}
+        onClick={() => navigate("tradecontrol")}
       >
+        ⚡ Gestão de Capital de Trading
+      </button>
+
+      {/* RESUMO MENSAL */}
+      <div style={styles.summaryBox}>
+        <div>
+          <strong>Trades:</strong> {summary.totalTrades}
+        </div>
+        <div>
+          <strong>Resultado Total:</strong>{" "}
+          <span style={{ color: summary.totalPnl >= 0 ? "#4caf50" : "#f44336" }}>
+            {summary.totalPnl.toFixed(2)} USDT
+          </span>
+        </div>
+        <div>
+          <strong>Média por Trade:</strong> {summary.avgPnl.toFixed(2)} USDT
+        </div>
+        <div>
+          <strong>Winrate:</strong> {summary.winrate.toFixed(2)}%
+        </div>
+      </div>
+
+      <button style={styles.addButton} onClick={() => setShowAdd(true)}>
         + Adicionar Trade
       </button>
 
-      <table style={{ width: "100%", color: "#fff", fontSize: 14 }}>
-        <thead>
-          <tr style={{ color: "#aaa" }}>
-            <th>Tipo</th>
-            <th>Entrada</th>
-            <th>Saída</th>
-            <th>Preço entrada</th>
-            <th>Preço saída</th>
-            <th>Qtd</th>
-            <th>Status</th>
-            <th>P&L</th>
-            <th>%</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((t) => {
-            const { pnl, pnlPercent, status } = computePnl(t);
-            const color =
-              status === "open"
-                ? "#f7931a"
-                : pnl > 0
-                ? "#4caf50"
-                : pnl < 0
-                ? "#f44336"
-                : "#fff";
+      <TradeTable
+        trades={trades}
+        computePnl={computePnl}
+        onEdit={(t) => setEditItem(t)}
+        onDelete={(id) => setDeleteId(id)}
+      />
 
-            return (
-              <tr key={t.id}>
-                <td>{t.type}</td>
-                <td>{t.entryDate}</td>
-                <td>{t.exitDate || "-"}</td>
-                <td>{t.entryPrice}</td>
-                <td>{t.exitPrice ?? "-"}</td>
-                <td>{t.amount}</td>
-                <td style={{ color }}>{status}</td>
-                <td style={{ color }}>{pnl.toFixed(2)}</td>
-                <td style={{ color }}>{pnlPercent.toFixed(2)}%</td>
-                <td>
-                  <button
-                    onClick={() => setEditItem(t)}
-                    style={editBtn}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => setDeleteId(t.id)}
-                    style={deleteBtn}
-                  >
-                    Remover
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
+      {/* ADICIONAR */}
       {showAdd && (
         <TradeFormModal
           onClose={() => setShowAdd(false)}
@@ -120,17 +135,26 @@ export const TradesPage = () => {
         />
       )}
 
+      {/* EDITAR */}
       {editItem && (
         <TradeFormModal
           initial={editItem}
           onClose={() => setEditItem(null)}
           onSubmit={(t) => {
-            editTrade({ id: editItem.id, ...t });
+            const updated = { id: editItem.id, ...t };
+            editTrade(updated);
+
+            if (updated.exitPrice) {
+              const pnl = computePnl(updated);
+              registerClosedTrade(updated, pnl.pnl);
+            }
+
             setEditItem(null);
           }}
         />
       )}
 
+      {/* REMOVER */}
       {deleteId && (
         <ConfirmDeleteModal
           onClose={() => setDeleteId(null)}
@@ -140,25 +164,55 @@ export const TradesPage = () => {
           }}
         />
       )}
-    </>
+    </div>
   );
 };
 
-const editBtn: React.CSSProperties = {
-  padding: "4px 10px",
-  background: "#444",
-  border: "1px solid #555",
-  borderRadius: 6,
-  color: "#fff",
-  cursor: "pointer",
-  marginRight: 8,
-};
+/* -----------------------------------------------------
+   STYLES
+----------------------------------------------------- */
 
-const deleteBtn: React.CSSProperties = {
-  padding: "4px 10px",
-  background: "#d9534f",
-  border: "none",
-  borderRadius: 6,
-  color: "#fff",
-  cursor: "pointer",
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    padding: 20,
+    color: "#fff",
+    fontFamily: "Inter, system-ui, sans-serif",
+  },
+  title: {
+    fontSize: 32,
+    marginBottom: 20,
+  },
+
+  controlButton: {
+    padding: "12px 20px",
+    background: "#222",
+    border: "1px solid #333",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: "bold",
+    color: "#f7931a",
+    marginBottom: 20,
+  },
+
+  summaryBox: {
+    background: "#111",
+    padding: 20,
+    borderRadius: 12,
+    border: "1px solid #222",
+    marginBottom: 30,
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 16,
+  },
+
+  addButton: {
+    padding: "12px 20px",
+    background: "#f7931a",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: "bold",
+    color: "#000",
+    marginBottom: 30,
+  },
 };
