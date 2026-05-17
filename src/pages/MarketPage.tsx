@@ -5,6 +5,38 @@ import { useFearGreed } from "../hooks/useFearGreed";
 import { useBTCDominance } from "../hooks/useBTCDominance";
 import { useMarketIntelligence } from "../engine/useMarketIntelligence";
 
+/* ---------------------------------------------------------
+   SAFE HELPER — protege contra null, undefined, NaN
+--------------------------------------------------------- */
+const safe = (v: any, fallback = 0): number =>
+  typeof v === "number" && Number.isFinite(v) ? v : fallback;
+
+/* ---------------------------------------------------------
+   SCORE BAR (visual premium)
+--------------------------------------------------------- */
+const ScoreBar = ({ value }: { value: number }) => {
+  const v = Math.max(0, Math.min(100, value));
+  const color =
+    v > 70 ? "#22c55e" : v > 40 ? "#eab308" : "#ef4444";
+
+  return (
+    <div style={{ width: "100%", background: "#111", borderRadius: 6, height: 8 }}>
+      <div
+        style={{
+          width: `${v}%`,
+          height: "100%",
+          borderRadius: 6,
+          background: color,
+          transition: "width 0.3s ease",
+        }}
+      />
+    </div>
+  );
+};
+
+/* ---------------------------------------------------------
+   MARKET PAGE
+--------------------------------------------------------- */
 export const MarketPage = () => {
   const market = useBitcoinData();
   const onchain = useOnChainData();
@@ -20,21 +52,57 @@ export const MarketPage = () => {
     return (
       <div style={styles.loadingWrapper}>
         <div style={styles.spinner} />
-        <div style={styles.loadingText}>A analisar o mercado em tempo real</div>
-
-        {/* SPINNER ANIMATION */}
-        <style>
-          {`
-            @keyframes spin {
-              to { transform: rotate(360deg); }
-            }
-          `}
-        </style>
+        <div style={styles.loadingText}>A analisar o mercado em tempo real…</div>
       </div>
     );
   }
 
-  /* ---------------- PAGE CONTENT ---------------- */
+  /* ---------------------------------------------------------
+     ÍNDICES INSTITUCIONAIS (com safe())
+  --------------------------------------------------------- */
+
+  const mempool = safe(onchain?.mempoolTxCount);
+  const feeHigh = safe(onchain?.feeHigh);
+  const hashrate = safe(onchain?.hashrate);
+  const vol = safe(market?.volatility24h);
+  const fg = safe(fearGreed);
+  const dom = safe(dominance);
+
+  const marketRegime =
+    intel.riskScore > 70
+      ? "Bearish (Risco Elevado)"
+      : intel.opportunityScore > 70
+      ? "Bullish (Oportunidade Forte)"
+      : intel.macroScore > 60
+      ? "Tendência Positiva"
+      : "Neutro";
+
+  const volatilityRegime =
+    vol > 8
+      ? "Alta Volatilidade (Risco)"
+      : vol > 4
+      ? "Volatilidade Moderada"
+      : "Volatilidade Baixa (Acumulação)";
+
+  const liquidityStress =
+    mempool > 250000 || feeHigh > 40
+      ? "Stress Elevado"
+      : mempool > 150000
+      ? "Stress Moderado"
+      : "Normal";
+
+  const onchainHealth = hashrate > 0 ? "Rede Saudável" : "Rede Estável";
+
+  const trendStrength =
+    intel.macroScore > 70
+      ? "Tendência Forte"
+      : intel.macroScore > 50
+      ? "Tendência Moderada"
+      : "Sem Tendência";
+
+  /* ---------------------------------------------------------
+     PAGE CONTENT
+  --------------------------------------------------------- */
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>Market Intelligence</h1>
@@ -43,7 +111,28 @@ export const MarketPage = () => {
       <div style={styles.card}>
         <div style={styles.label}>Score Global</div>
         <div style={styles.score}>{Math.round(intel.macroScore)}</div>
+        <ScoreBar value={intel.macroScore} />
         <div style={styles.sub}>{intel.marketState}</div>
+      </div>
+
+      <div style={styles.separator} />
+
+      {/* REGIMES */}
+      <div style={styles.card}>
+        <div style={styles.label}>Regime de Mercado</div>
+        <div style={styles.item}>{marketRegime}</div>
+
+        <div style={styles.label}>Volatilidade</div>
+        <div style={styles.item}>{volatilityRegime}</div>
+
+        <div style={styles.label}>Stress de Liquidez</div>
+        <div style={styles.item}>{liquidityStress}</div>
+
+        <div style={styles.label}>Saúde On‑Chain</div>
+        <div style={styles.item}>{onchainHealth}</div>
+
+        <div style={styles.label}>Força da Tendência</div>
+        <div style={styles.item}>{trendStrength}</div>
       </div>
 
       <div style={styles.separator} />
@@ -70,6 +159,14 @@ export const MarketPage = () => {
           Risco {intel.riskScore.toFixed(0)} · Oportunidade{" "}
           {intel.opportunityScore.toFixed(0)}
         </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div style={styles.sub}>Risco</div>
+          <ScoreBar value={intel.riskScore} />
+
+          <div style={{ ...styles.sub, marginTop: 8 }}>Oportunidade</div>
+          <ScoreBar value={intel.opportunityScore} />
+        </div>
       </div>
 
       <div style={styles.separator} />
@@ -84,73 +181,8 @@ export const MarketPage = () => {
 
         <div style={styles.cleanList}>
           {intel.alerts.slice(0, 3).map((s, i) => (
-            <div key={i} style={styles.strong}>{s}</div>
+            <div key={i} style={styles.strong}>• {s}</div>
           ))}
-        </div>
-      </div>
-
-      <div style={styles.separator} />
-
-      {/* MERCADO */}
-      <div style={styles.card}>
-        <div style={styles.label}>Mercado</div>
-
-        <div style={styles.cleanList}>
-          <div style={styles.item}>
-            Sentimento:{" "}
-            {(fearGreed ?? 50) < 30
-              ? "Medo"
-              : (fearGreed ?? 50) < 70
-              ? "Neutro"
-              : "Ganância"}
-          </div>
-
-          <div style={styles.item}>
-            Dominância:{" "}
-            {dominance! > 55
-              ? "BTC a liderar"
-              : dominance! < 40
-              ? "Altcoins a liderar"
-              : "Equilíbrio"}
-          </div>
-
-          <div style={styles.item}>
-            Volatilidade:{" "}
-            {market!.volatility24h > 8
-              ? "Alta"
-              : market!.volatility24h > 4
-              ? "Média"
-              : "Baixa"}
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.separator} />
-
-      {/* ON-CHAIN */}
-      <div style={styles.card}>
-        <div style={styles.label}>On‑Chain</div>
-
-        <div style={styles.cleanList}>
-          <div style={styles.item}>
-            Rede: {onchain!.hashrate ? "Hashrate forte" : "Hashrate normal"}
-          </div>
-
-          <div style={styles.item}>
-            Mempool:{" "}
-            {onchain!.mempoolTxCount! > 200000
-              ? "Congestionado"
-              : "Fluido"}
-          </div>
-
-          <div style={styles.item}>
-            Fees:{" "}
-            {onchain!.feeHigh! > 50
-              ? "Altas"
-              : onchain!.feeHigh! > 15
-              ? "Médias"
-              : "Baixas"}
-          </div>
         </div>
       </div>
 
@@ -158,7 +190,7 @@ export const MarketPage = () => {
 
       {/* RESUMO FINAL */}
       <div style={styles.card}>
-        <div style={styles.label}>Resumo final</div>
+        <div style={styles.label}>Resumo Institucional</div>
         <div style={styles.summary}>
           {intel.narrative.split(".")[0]}
         </div>
@@ -170,7 +202,6 @@ export const MarketPage = () => {
 /* --- STYLES --- */
 
 const styles: Record<string, React.CSSProperties> = {
-  /* PAGE */
   page: {
     color: "#fff",
     fontFamily: "Inter, system-ui, sans-serif",
@@ -185,7 +216,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
 
-  /* CARDS */
   card: {
     background: "#0b0b0b",
     border: "1px solid #1f1f1f",
@@ -197,16 +227,18 @@ const styles: Record<string, React.CSSProperties> = {
   label: {
     fontSize: 14,
     color: "#aaa",
-    marginBottom: 8,
+    marginBottom: 4,
+    marginTop: 10,
   },
 
   score: {
     fontSize: 40,
     fontWeight: 700,
+    marginBottom: 6,
   },
 
   sub: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#aaa",
     marginTop: 4,
   },
@@ -231,6 +263,7 @@ const styles: Record<string, React.CSSProperties> = {
   item: {
     color: "#ddd",
     fontSize: 14,
+    marginBottom: 4,
   },
 
   strong: {
@@ -244,7 +277,6 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.5,
   },
 
-  /* LOADING */
   loadingWrapper: {
     height: "100vh",
     display: "flex",
@@ -253,7 +285,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 20,
     color: "#fff",
-    fontFamily: "Inter, system-ui, sans-serif",
   },
 
   spinner: {

@@ -1,5 +1,6 @@
+// src/pages/CapitalControlPage.tsx
 import React, { useState, useMemo } from "react";
-import { useCapital } from "../context/CapitalContext";
+import { useNavigation } from "../context/NavigationContext";
 import { usePortfolio } from "../context/PortfolioContext";
 import { useBitcoinData } from "../hooks/useBitcoinData";
 import { useOnChainData } from "../hooks/useOnChainData";
@@ -13,26 +14,45 @@ import { useLedger } from "../context/LedgerContext";
 export const CapitalControlPage: React.FC = () => {
   useCapitalPortfolioSync();
 
-  const {
-    totalDeposited,
-    availableFunds,
-    usedFunds,
-  } = useCapital();
-
+  const { navigate } = useNavigation();
   const portfolio = usePortfolio();
   const market = useBitcoinData();
   const onchain = useOnChainData();
   const fearGreed = useFearGreed();
   const dominance = useBTCDominance();
-  const { addEntry } = useLedger();
+  const { entries, addEntry } = useLedger();
 
-  const marketIntelRaw = useMarketIntelligence(
-    market,
-    onchain,
-    fearGreed,
-    dominance
-  );
+  // LIQUIDEZ REAL A PARTIR DO LEDGER
+  const {
+    totalDeposited,
+    availableFunds,
+    usedFunds,
+  } = useMemo(() => {
+    let deposits = 0;
+    let withdraws = 0;
+    let buys = 0;
+    let sells = 0;
 
+    for (const e of entries) {
+      if (e.type === "DEPOSIT") deposits += e.amountEUR ?? 0;
+      if (e.type === "WITHDRAW") withdraws += e.amountEUR ?? 0;
+      if (e.type === "BUY" || e.type === "ENGINE_BUY") buys += e.amountEUR ?? 0;
+      if (e.type === "SELL" || e.type === "ENGINE_SELL") sells += e.amountEUR ?? 0;
+      // ENGINE_REBALANCE ignorado (A3)
+    }
+
+    const totalDep = deposits - withdraws;
+    const avail = totalDep - buys + sells;
+    const used = totalDep - avail;
+
+    return {
+      totalDeposited: totalDep,
+      availableFunds: Math.max(avail, 0),
+      usedFunds: Math.max(used, 0),
+    };
+  }, [entries]);
+
+  // DADOS DE MERCADO / PORTFOLIO
   const btcPrice = market?.priceEUR ?? 0;
   const athEUR = (market as any)?.athEUR ?? null;
   const halvingCycle = (market as any)?.halvingCycle ?? null;
@@ -43,8 +63,14 @@ export const CapitalControlPage: React.FC = () => {
 
   const pnl = currentValue - totalInvested;
   const pnlPercent = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
-
   const realizedProfit = portfolio.realizedProfit ?? 0;
+
+  const marketIntelRaw = useMarketIntelligence(
+    market,
+    onchain,
+    fearGreed,
+    dominance
+  );
 
   const marketIntel = {
     macroScore: marketIntelRaw?.macroScore ?? 0,
@@ -59,7 +85,7 @@ export const CapitalControlPage: React.FC = () => {
     recommendation: marketIntelRaw?.recommendation ?? "neutral",
   };
 
-  // ATH / regime
+  // ATH / REGIME
   let athContext = "Sem dados de ATH disponíveis.";
   let athDistancePct: number | null = null;
   let regimeLabel = "Regime neutro";
@@ -69,98 +95,65 @@ export const CapitalControlPage: React.FC = () => {
     const abs = Math.abs(athDistancePct);
 
     if (athDistancePct <= -60) {
-      athContext = `Preço cerca de ${abs.toFixed(
-        1
-      )}% abaixo do ATH — fase de desconto profundo, acumulação agressiva faz sentido se a liquidez estiver confortável.`;
+      athContext = `Preço cerca de ${abs.toFixed(1)}% abaixo do ATH — desconto profundo.`;
       regimeLabel = "Acumulação agressiva";
     } else if (athDistancePct <= -30) {
-      athContext = `Preço ${abs.toFixed(
-        1
-      )}% abaixo do ATH — boa fase de acumulação consistente e disciplinada.`;
+      athContext = `Preço ${abs.toFixed(1)}% abaixo do ATH — acumulação forte.`;
       regimeLabel = "Acumulação forte";
     } else if (athDistancePct < 0) {
-      athContext = `Preço ${abs.toFixed(
-        1
-      )}% abaixo do ATH — acumulação moderada, sem euforia.`;
+      athContext = `Preço ${abs.toFixed(1)}% abaixo do ATH — acumulação moderada.`;
       regimeLabel = "Acumulação moderada";
     } else if (athDistancePct >= 0 && athDistancePct <= 10) {
-      athContext =
-        "Estamos muito perto ou ligeiramente acima do ATH — zona clássica para realização parcial e gestão de risco.";
+      athContext = "Perto do ATH — zona de realização parcial.";
       regimeLabel = "Realização parcial";
     } else {
-      athContext = `Preço ${athDistancePct.toFixed(
-        1
-      )}% acima do ATH — fase de euforia, foco em proteção de capital e realização faseada.`;
+      athContext = `Preço ${athDistancePct.toFixed(1)}% acima do ATH — euforia.`;
       regimeLabel = "Euforia / proteção";
     }
   }
 
-  // Ciclo / halving
-  let cycleContext = "Sem dados de ciclo de halving disponíveis.";
-  if (halvingCycle && typeof halvingCycle === "object") {
+  // CICLO / HALVING
+  let cycleContext = "Sem dados de ciclo disponíveis.";
+  if (halvingCycle) {
     const phase = halvingCycle.phase ?? "desconhecida";
-    const daysToHalving = halvingCycle.daysToHalving ?? null;
-    const daysFromHalving = halvingCycle.daysFromHalving ?? null;
+    const daysToHalving = halvingCycle.daysToHalving;
+    const daysFromHalving = halvingCycle.daysFromHalving;
 
-    if (daysToHalving != null && daysToHalving > 0) {
-      cycleContext = `Estamos a ${daysToHalving} dias do próximo halving — historicamente fase de acumulação estratégica. Fase atual: ${phase}.`;
-    } else if (daysFromHalving != null && daysFromHalving >= 0) {
-      cycleContext = `Estamos a ${daysFromHalving} dias após o halving — historicamente fase de construção de tendência. Fase atual: ${phase}.`;
+    if (daysToHalving > 0) {
+      cycleContext = `A ${daysToHalving} dias do halving — fase de acumulação.`;
+    } else if (daysFromHalving >= 0) {
+      cycleContext = `A ${daysFromHalving} dias após o halving — tendência de construção.`;
     } else {
       cycleContext = `Fase de ciclo: ${phase}.`;
     }
   }
 
-  // DCA config (manual)
-  const [dcaTarget, setDcaTarget] = useState<number>(1); // € / dia alvo
+  // DCA CONFIG
+  const [dcaTarget, setDcaTarget] = useState<number>(1);
 
   const runwayDays =
     availableFunds > 0 && dcaTarget > 0
       ? Math.floor(availableFunds / dcaTarget)
       : 0;
 
-  let dcaIntensityLabel = "Normal";
   let dcaMultiplier = 1;
+  let dcaIntensityLabel = "Normal";
 
   if (
     marketIntel.opportunityScore > 75 &&
     athDistancePct != null &&
     athDistancePct < -30
   ) {
-    dcaIntensityLabel = "Reforçar";
     dcaMultiplier = 2.5;
-  } else if (
-    marketIntel.riskScore > 75 &&
-    athDistancePct != null &&
-    athDistancePct > 0
-  ) {
-    dcaIntensityLabel = "Reduzir";
+    dcaIntensityLabel = "Reforçar";
+  } else if (marketIntel.riskScore > 75) {
     dcaMultiplier = 0.5;
-  } else if (marketIntel.riskScore > 80) {
     dcaIntensityLabel = "Defensivo";
-    dcaMultiplier = 0.5;
-  } else if (marketIntel.opportunityScore < 40 && marketIntel.riskScore < 40) {
-    dcaIntensityLabel = "Manter";
-    dcaMultiplier = 1;
   }
 
   const effectiveDailyDCA = dcaTarget * dcaMultiplier;
 
-  // Market intel para o motor
-  const marketIntelForEngine = {
-    riskScore: marketIntel.riskScore,
-    opportunityScore: marketIntel.opportunityScore,
-    marketState: marketIntel.marketState,
-    recommendation: marketIntel.recommendation,
-    athDistancePct: athDistancePct ?? undefined,
-    cyclePhase: halvingCycle?.phase,
-    volatilityScore: market?.volatility30d,
-    dominance: dominance ?? undefined,
-    momentumScore: market?.momentumScore,
-    trendStrength: market?.trendStrength,
-    liquidityScore: marketIntel.liquidityScore,
-  };
-
+  // CAPITAL ENGINE
   const capitalIntel = useCapitalEngine(
     {
       availableFunds,
@@ -170,21 +163,25 @@ export const CapitalControlPage: React.FC = () => {
       realizedProfit,
       unrealizedProfit: pnl,
     },
-    marketIntelForEngine
+    {
+      riskScore: marketIntel.riskScore,
+      opportunityScore: marketIntel.opportunityScore,
+      marketState: marketIntel.marketState,
+      recommendation: marketIntel.recommendation,
+      athDistancePct: athDistancePct ?? undefined,
+      cyclePhase: halvingCycle?.phase,
+      volatilityScore: market?.volatility30d,
+      dominance: dominance ?? undefined,
+      momentumScore: market?.momentumScore,
+      trendStrength: market?.trendStrength,
+      liquidityScore: marketIntel.liquidityScore,
+    }
   );
 
   const exposureCurrent = capitalIntel.exposureCurrent ?? 0;
   const exposureIdeal = capitalIntel.exposureIdeal ?? 0;
 
-  const headerLine1 = `Olá BSquare. O mercado está em regime de ${regimeLabel.toLowerCase()}.`;
-  const headerLine2 = `Exposição atual: ${exposureCurrent.toFixed(
-    1
-  )}% · Exposição ideal: ${exposureIdeal.toFixed(1)}% · Runway: ${
-    runwayDays > 0 ? `${runwayDays} dias` : "sem runway"
-  }.`;
-  const headerLine3 = `Recomendação atual do assistente: ${capitalIntel.action} (${capitalIntel.intensity}).`;
-
-  // ALERTAS (UI)
+  // ALERTAS
   const uiAlerts = useMemo(() => {
     const list: string[] = [];
 
@@ -193,27 +190,23 @@ export const CapitalControlPage: React.FC = () => {
       marketIntel.technicalScore === 0 &&
       marketIntel.onChainScore === 0
     ) {
-      list.push(
-        "Sem scores de mercado — verifica se os hooks de dados estão a devolver valores reais ou se estás em modo mock."
-      );
+      list.push("Sem dados de mercado — verifica os hooks.");
     }
 
     if (availableFunds > 0 && totalBTC === 0) {
-      list.push(
-        "Tens capital disponível e 0 BTC — cenário clássico para definir plano de entrada faseado."
-      );
+      list.push("Tens liquidez e 0 BTC — cenário clássico para acumulação.");
     }
 
-    if (marketIntel.opportunityScore > 70 && athDistancePct != null && athDistancePct < -30) {
-      list.push(
-        "Oportunidade forte: preço bem abaixo do ATH com score de oportunidade elevado — considera alocar parte da liquidez."
-      );
+    if (
+      marketIntel.opportunityScore > 70 &&
+      athDistancePct != null &&
+      athDistancePct < -30
+    ) {
+      list.push("Oportunidade forte — preço bem abaixo do ATH.");
     }
 
     if (marketIntel.riskScore > 75) {
-      list.push(
-        "Risco elevado — evita alocações agressivas, foca-te em gestão de liquidez e proteção de capital."
-      );
+      list.push("Risco elevado — cautela recomendada.");
     }
 
     if (marketIntel.alerts.length > 0) {
@@ -221,19 +214,9 @@ export const CapitalControlPage: React.FC = () => {
     }
 
     return list;
-  }, [
-    marketIntel.macroScore,
-    marketIntel.technicalScore,
-    marketIntel.onChainScore,
-    marketIntel.opportunityScore,
-    marketIntel.riskScore,
-    marketIntel.alerts,
-    availableFunds,
-    totalBTC,
-    athDistancePct,
-  ]);
+  }, [marketIntel, availableFunds, totalBTC, athDistancePct]);
 
-  // Registar DCA de hoje (Ledger + Portfolio via Ledger)
+  // REGISTAR DCA
   const handleRegisterDCA = () => {
     if (!btcPrice || btcPrice <= 0) return;
     if (effectiveDailyDCA <= 0) return;
@@ -243,78 +226,53 @@ export const CapitalControlPage: React.FC = () => {
     const amountBTC = amountEUR / btcPrice;
     const nowIso = new Date().toISOString();
 
-    // Compra real de BTC via Ledger
     addEntry({
       id: crypto.randomUUID(),
       type: "BUY",
       amountEUR,
       amountBTC,
       date: nowIso,
-      meta: {
-        kind: "DCA_BUY",
-        source: "capital-engine",
-        dcaDailyTarget: dcaTarget,
-        dcaMultiplier,
-      },
+      meta: { kind: "DCA_BUY" },
     });
 
-    // Evento de motor para histórico de estratégia
     addEntry({
       id: crypto.randomUUID(),
       type: "ENGINE_BUY",
       amountEUR: 0,
       amountBTC: 0,
       date: nowIso,
-      meta: {
-        kind: "DCA_DAILY_MARK",
-        note: "Registo de DCA diário a partir do CapitalControl",
-        dcaEffectiveEUR: amountEUR,
-      },
+      meta: { kind: "DCA_DAILY_MARK", dcaEffectiveEUR: amountEUR },
     });
   };
 
-  // Ações rápidas — mudança de modo de estratégia (apenas histórico por agora)
-  const handleStrategyModeChange = (mode: "AGGRESSIVE" | "NORMAL" | "DEFENSIVE") => {
-    const nowIso = new Date().toISOString();
+  // MUDAR MODO
+  const handleStrategyModeChange = (
+    mode: "AGGRESSIVE" | "NORMAL" | "DEFENSIVE"
+  ) => {
     addEntry({
       id: crypto.randomUUID(),
       type: "ENGINE_BUY",
       amountEUR: 0,
       amountBTC: 0,
-      date: nowIso,
-      meta: {
-        kind: "STRATEGY_MODE_CHANGE",
-        mode,
-      },
+      date: new Date().toISOString(),
+      meta: { kind: "STRATEGY_MODE_CHANGE", mode },
     });
   };
 
   const currentModeLabel =
-  dcaMultiplier > 1
-    ? "AGGRESSIVE"
-    : dcaMultiplier < 1
-    ? "DEFENSIVE"
-    : "NORMAL";
+    dcaMultiplier > 1 ? "AGGRESSIVE" : dcaMultiplier < 1 ? "DEFENSIVE" : "NORMAL";
 
+  // RENDER
   return (
     <div style={styles.page}>
       {/* TOP BAR */}
       <div style={styles.topBar}>
-        <div style={styles.topRightGroup}>
-          <button
-            style={styles.ledgerButton}
-            onClick={() => {
-              // aqui assumes que tens routing tipo react-router
-              // se não tiveres, podes trocar por link normal
-              window.location.href = "/ledger";
-            }}
-          >
-            Capital &amp; Exposição (Ledger)
-          </button>
-        </div>
+        <button style={styles.ledgerButton} onClick={() => navigate("ledger")}>
+          Capital & Exposição (Ledger)
+        </button>
       </div>
 
-      {/* ALERTAS NO TOPO */}
+      {/* ALERTAS */}
       {uiAlerts.length > 0 && (
         <div style={styles.alertBar}>
           {uiAlerts.map((a, i) => (
@@ -325,85 +283,57 @@ export const CapitalControlPage: React.FC = () => {
         </div>
       )}
 
-      {/* ASSISTENTE CONVERSACIONAL */}
+      {/* ASSISTENTE */}
       <div style={styles.assistantCard}>
         <div style={styles.assistantTitle}>Assistente Financeiro Pessoal</div>
-        <div style={styles.assistantLine}>{headerLine1}</div>
-        <div style={styles.assistantLine}>{headerLine2}</div>
-        <div style={styles.assistantLineHighlight}>{headerLine3}</div>
+        <div style={styles.assistantLine}>
+          Olá BSquare. O mercado está em regime de {regimeLabel.toLowerCase()}.
+        </div>
+        <div style={styles.assistantLine}>
+          Exposição atual: {exposureCurrent.toFixed(1)}% · ideal:{" "}
+          {exposureIdeal.toFixed(1)}% · runway:{" "}
+          {runwayDays > 0 ? `${runwayDays} dias` : "sem runway"}.
+        </div>
+        <div style={styles.assistantLineHighlight}>
+          Recomendação: {capitalIntel.action} ({capitalIntel.intensity})
+        </div>
       </div>
 
-      {/* RESUMO RÁPIDO */}
+      {/* QUICK GRID */}
       <div style={styles.quickGrid}>
-        <div style={styles.quickCard}>
-          <div style={styles.quickLabel}>Exposição Atual</div>
-          <div style={styles.quickValue}>{exposureCurrent.toFixed(1)}%</div>
-        </div>
-        <div style={styles.quickCard}>
-          <div style={styles.quickLabel}>Exposição Ideal</div>
-          <div style={styles.quickValue}>{exposureIdeal.toFixed(1)}%</div>
-        </div>
-        <div style={styles.quickCard}>
-          <div style={styles.quickLabel}>Runway DCA</div>
-          <div style={styles.quickValue}>
-            {runwayDays > 0 ? `${runwayDays} dias` : "Sem runway"}
-          </div>
-        </div>
-        <div style={styles.quickCard}>
-          <div style={styles.quickLabel}>Regime</div>
-          <div style={styles.quickValue}>{regimeLabel}</div>
-        </div>
+        <QuickCard label="Exposição Atual" value={`${exposureCurrent.toFixed(1)}%`} />
+        <QuickCard label="Exposição Ideal" value={`${exposureIdeal.toFixed(1)}%`} />
+        <QuickCard
+          label="Runway DCA"
+          value={runwayDays > 0 ? `${runwayDays} dias` : "Sem runway"}
+        />
+        <QuickCard label="Regime" value={regimeLabel} />
       </div>
 
       <div style={styles.separator} />
 
-      {/* CONFIGURAÇÃO DE DCA */}
+      {/* DCA CONFIG */}
       <h2 style={styles.sectionTitle}>Configuração de DCA</h2>
       <div style={styles.card}>
-        <div style={styles.row}>
-          <span>DCA diário alvo</span>
-          <span>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={dcaTarget}
-              onChange={(e) => setDcaTarget(Number(e.target.value) || 0)}
-              style={styles.dcaInput}
-            />{" "}
-            €
-          </span>
-        </div>
+        <Row label="DCA diário alvo">
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={dcaTarget}
+            onChange={(e) => setDcaTarget(Number(e.target.value) || 0)}
+            style={styles.dcaInput}
+          />{" "}
+          €
+        </Row>
 
-        <div style={styles.row}>
-          <span>Multiplicador efetivo</span>
-          <span style={styles.value}>{dcaMultiplier.toFixed(2)}x</span>
-        </div>
-
-        <div style={styles.row}>
-          <span>DCA efetivo sugerido</span>
-          <span style={styles.value}>
-            {effectiveDailyDCA.toFixed(2)} € / dia
-          </span>
-        </div>
-
-        <div style={styles.row}>
-          <span>Modo atual</span>
-          <span style={styles.value}>{currentModeLabel}</span>
-        </div>
+        <Row label="Multiplicador efetivo" value={`${dcaMultiplier.toFixed(2)}x`} />
+        <Row label="DCA efetivo" value={`${effectiveDailyDCA.toFixed(2)} € / dia`} />
+        <Row label="Modo atual" value={currentModeLabel} />
 
         <button style={styles.actionButton} onClick={handleRegisterDCA}>
           Registar DCA de hoje (Ledger)
         </button>
-
-        <div style={styles.subLabel}>Nota</div>
-        <div style={styles.summary}>
-          Quando clicas em &quot;Registar DCA de hoje&quot;, o sistema calcula
-          quantos BTC corresponderam ao DCA efetivo ao preço atual e grava um
-          BUY no Ledger com esse valor de BTC. Em paralelo, grava também um
-          evento de motor com meta de DCA. O Portfolio e o Estado do Capital
-          passam a refletir esta acumulação real.
-        </div>
       </div>
 
       <div style={styles.separator} />
@@ -413,76 +343,47 @@ export const CapitalControlPage: React.FC = () => {
       <div style={styles.grid}>
         <div style={styles.card}>
           <div style={styles.label}>Narrativa Estratégica</div>
-          <div style={styles.subLabel}>ATH &amp; Ciclo</div>
+          <div style={styles.subLabel}>ATH & Ciclo</div>
           <div style={styles.summary}>{athContext}</div>
           <div style={styles.summary}>{cycleContext}</div>
 
           <div style={styles.subLabel}>Narrativa de Mercado</div>
           <div style={styles.summary}>
-            {marketIntel.narrative || "Sem narrativa detalhada disponível."}
+            {marketIntel.narrative || "Sem narrativa disponível."}
           </div>
         </div>
 
         <div style={styles.card}>
           <div style={styles.label}>Recomendação Atual</div>
-
-          <div style={styles.row}>
-            <span>Ação</span>
-            <span style={{ ...styles.value, color: "#f7931a" }}>
-              {capitalIntel.action}
-            </span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Intensidade</span>
-            <span style={styles.value}>{capitalIntel.intensity}</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Modo DCA</span>
-            <span style={styles.value}>{dcaIntensityLabel}</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>DCA base</span>
-            <span style={styles.value}>{dcaTarget.toFixed(2)} € / dia</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>DCA efetivo</span>
-            <span style={styles.value}>
-              {effectiveDailyDCA.toFixed(2)} € / dia
-            </span>
-          </div>
+          <Row label="Ação" value={capitalIntel.action} />
+          <Row label="Intensidade" value={capitalIntel.intensity} />
+          <Row label="Modo DCA" value={dcaIntensityLabel} />
+          <Row label="DCA base" value={`${dcaTarget.toFixed(2)} € / dia`} />
+          <Row
+            label="DCA efetivo"
+            value={`${effectiveDailyDCA.toFixed(2)} € / dia`}
+          />
 
           {capitalIntel.suggestedBuy > 0 && (
-            <div style={styles.row}>
-              <span>Compra sugerida</span>
-              <span style={styles.value}>
-                {capitalIntel.suggestedBuy.toFixed(2)} €
-              </span>
-            </div>
+            <Row
+              label="Compra sugerida"
+              value={`${capitalIntel.suggestedBuy.toFixed(2)} €`}
+            />
           )}
 
           {capitalIntel.suggestedSell > 0 && (
-            <div style={styles.row}>
-              <span>Venda sugerida</span>
-              <span style={styles.value}>
-                {capitalIntel.suggestedSell.toFixed(2)} €
-              </span>
-            </div>
+            <Row
+              label="Venda sugerida"
+              value={`${capitalIntel.suggestedSell.toFixed(2)} €`}
+            />
           )}
 
           <div style={styles.subLabel}>Resumo do Assistente</div>
           <div style={styles.summary}>
-            {capitalIntel.narrative ||
-              `Exposição atual: ${exposureCurrent.toFixed(
-                1
-              )}% (ideal: ${exposureIdeal.toFixed(
-                1
-              )}%). Liquidez disponível: ${availableFunds.toFixed(
-                2
-              )} €. O assistente ajusta a intensidade de acumulação em função do regime de mercado, risco e oportunidade.`}
+            Exposição atual: {exposureCurrent.toFixed(1)}% (ideal:{" "}
+            {exposureIdeal.toFixed(1)}%). Liquidez disponível:{" "}
+            {availableFunds.toFixed(2)} €. O assistente ajusta a intensidade de
+            acumulação em função do regime de mercado, risco e oportunidade.
           </div>
         </div>
       </div>
@@ -495,27 +396,13 @@ export const CapitalControlPage: React.FC = () => {
         <div style={styles.card}>
           <div style={styles.label}>Liquidez</div>
 
-          <div style={styles.row}>
-            <span>Disponível</span>
-            <span style={styles.value}>{availableFunds.toFixed(2)} €</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Usado</span>
-            <span style={styles.value}>{usedFunds.toFixed(2)} €</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Total Depositado</span>
-            <span style={styles.value}>{totalDeposited.toFixed(2)} €</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Runway DCA efetivo</span>
-            <span style={styles.value}>
-              {runwayDays > 0 ? `${runwayDays} dias` : "Sem runway"}
-            </span>
-          </div>
+          <Row label="Disponível" value={`${availableFunds.toFixed(2)} €`} />
+          <Row label="Usado" value={`${usedFunds.toFixed(2)} €`} />
+          <Row label="Total Depositado" value={`${totalDeposited.toFixed(2)} €`} />
+          <Row
+            label="Runway DCA efetivo"
+            value={runwayDays > 0 ? `${runwayDays} dias` : "Sem runway"}
+          />
 
           {totalDeposited === 0 && (
             <div style={{ ...styles.summary, marginTop: 8 }}>
@@ -528,38 +415,21 @@ export const CapitalControlPage: React.FC = () => {
         <div style={styles.card}>
           <div style={styles.label}>Portfolio</div>
 
-          <div style={styles.row}>
-            <span>Total BTC</span>
-            <span style={styles.value}>{totalBTC.toFixed(6)} BTC</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Valor Atual</span>
-            <span style={styles.value}>{currentValue.toFixed(2)} €</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>PnL não realizado</span>
-            <span
-              style={{
-                ...styles.value,
-                color: pnl >= 0 ? "#22c55e" : "#f43f5e",
-              }}
-            >
-              {pnl.toFixed(2)} € ({pnlPercent.toFixed(2)}%)
-            </span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Lucro Realizado</span>
-            <span style={styles.value}>{realizedProfit.toFixed(2)} €</span>
-          </div>
+          <Row label="Total BTC" value={`${totalBTC.toFixed(6)} BTC`} />
+          <Row label="Valor Atual" value={`${currentValue.toFixed(2)} €`} />
+          <Row
+            label="PnL não realizado"
+            value={`${pnl.toFixed(2)} € (${pnlPercent.toFixed(2)}%)`}
+          />
+          <Row
+            label="Lucro Realizado"
+            value={`${realizedProfit.toFixed(2)} €`}
+          />
 
           {totalBTC === 0 && availableFunds > 0 && (
             <div style={{ ...styles.summary, marginTop: 8 }}>
               Tens capital mas ainda não tens BTC — o sistema interpreta isto
-              como liquidez à espera de ser alocada. O DCA e as sugestões de
-              compra ajudam a transformar esta liquidez em exposição gradual.
+              como liquidez à espera de ser alocada.
             </div>
           )}
         </div>
@@ -567,59 +437,30 @@ export const CapitalControlPage: React.FC = () => {
         <div style={styles.card}>
           <div style={styles.label}>Scores de Mercado</div>
 
-          {marketIntel.macroScore === 0 &&
-          marketIntel.technicalScore === 0 &&
-          marketIntel.onChainScore === 0 ? (
-            <div style={styles.summary}>
-              Sem scores de mercado disponíveis. Garante que os hooks de dados
-              (`useBitcoinData`, `useOnChainData`, etc.) estão a devolver
-              valores reais.
-            </div>
-          ) : (
-            <>
-              <div style={styles.row}>
-                <span>Macro</span>
-                <span style={styles.value}>
-                  {marketIntel.macroScore.toFixed(1)} / 100
-                </span>
-              </div>
-
-              <div style={styles.row}>
-                <span>Técnico</span>
-                <span style={styles.value}>
-                  {marketIntel.technicalScore.toFixed(1)} / 100
-                </span>
-              </div>
-
-              <div style={styles.row}>
-                <span>On‑Chain</span>
-                <span style={styles.value}>
-                  {marketIntel.onChainScore.toFixed(1)} / 100
-                </span>
-              </div>
-
-              <div style={styles.row}>
-                <span>Liquidez</span>
-                <span style={styles.value}>
-                  {marketIntel.liquidityScore.toFixed(1)} / 100
-                </span>
-              </div>
-
-              <div style={styles.row}>
-                <span>Risco</span>
-                <span style={styles.value}>
-                  {marketIntel.riskScore.toFixed(1)} / 100
-                </span>
-              </div>
-
-              <div style={styles.row}>
-                <span>Oportunidade</span>
-                <span style={styles.value}>
-                  {marketIntel.opportunityScore.toFixed(1)} / 100
-                </span>
-              </div>
-            </>
-          )}
+          <Row
+            label="Macro"
+            value={`${marketIntel.macroScore.toFixed(1)} / 100`}
+          />
+          <Row
+            label="Técnico"
+            value={`${marketIntel.technicalScore.toFixed(1)} / 100`}
+          />
+          <Row
+            label="On‑Chain"
+            value={`${marketIntel.onChainScore.toFixed(1)} / 100`}
+          />
+          <Row
+            label="Liquidez"
+            value={`${marketIntel.liquidityScore.toFixed(1)} / 100`}
+          />
+          <Row
+            label="Risco"
+            value={`${marketIntel.riskScore.toFixed(1)} / 100`}
+          />
+          <Row
+            label="Oportunidade"
+            value={`${marketIntel.opportunityScore.toFixed(1)} / 100`}
+          />
         </div>
       </div>
 
@@ -632,11 +473,12 @@ export const CapitalControlPage: React.FC = () => {
         <div style={styles.subLabel}>Impacto dos modos</div>
         <div style={styles.summary}>
           Os modos ajustam o multiplicador de DCA (agressivo, normal, defensivo)
-          e são registados no Ledger como eventos de motor. No futuro, o motor
-          pode usar estes eventos para ajustar regras de risco e execução real.
+          e são registados no Ledger como eventos de motor.
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+        <div
+          style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}
+        >
           <button
             style={styles.actionButton}
             onClick={() => handleStrategyModeChange("AGGRESSIVE")}
@@ -685,7 +527,34 @@ export const CapitalControlPage: React.FC = () => {
   );
 };
 
-/* ---------------- STYLES ---------------- */
+// COMPONENTES AUXILIARES
+
+interface RowProps {
+  label: string;
+  value?: React.ReactNode;
+  children?: React.ReactNode;
+}
+
+const Row: React.FC<RowProps> = ({ label, value, children }) => (
+  <div style={styles.row}>
+    <span>{label}</span>
+    <span style={styles.value}>{value ?? children}</span>
+  </div>
+);
+
+interface QuickCardProps {
+  label: string;
+  value: string;
+}
+
+const QuickCard: React.FC<QuickCardProps> = ({ label, value }) => (
+  <div style={styles.quickCard}>
+    <div style={styles.quickLabel}>{label}</div>
+    <div style={styles.quickValue}>{value}</div>
+  </div>
+);
+
+// STYLES
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
@@ -699,10 +568,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "flex-end",
     marginBottom: 12,
-  },
-  topRightGroup: {
-    display: "flex",
-    gap: 8,
   },
   ledgerButton: {
     padding: "8px 14px",
