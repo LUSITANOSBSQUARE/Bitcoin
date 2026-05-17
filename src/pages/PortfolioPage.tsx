@@ -1,170 +1,341 @@
-import React, { useState } from "react";
+import React from "react";
 import { usePortfolio } from "../context/PortfolioContext";
 import { useBitcoinData } from "../hooks/useBitcoinData";
-import { TransactionFormModal } from "../components/TransactionFormModal";
-import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
 export const PortfolioPage = () => {
-  const { transactions, addTransaction, editTransaction, removeTransaction } =
-    usePortfolio();
-  const data = useBitcoinData();
+  const { transactions, totalBTC, totalInvested, avgPrice } = usePortfolio();
+  const market = useBitcoinData();
 
-  const [showAdd, setShowAdd] = useState(false);
-  const [editTx, setEditTx] = useState<any>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  const totalBTC = transactions.reduce((s, t) => s + t.amountBTC, 0);
-  const totalInvested = transactions.reduce(
-    (s, t) => s + t.amountBTC * t.priceUSD,
-    0
-  );
-
-  const avgPrice = totalBTC > 0 ? totalInvested / totalBTC : 0;
-  const currentValue = data ? totalBTC * data.priceEUR : 0;
-
+  const currentPrice = market?.priceEUR ?? 0;
+  const currentValue = totalBTC * currentPrice;
   const pnl = currentValue - totalInvested;
   const roi = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
 
+  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  const labels = sorted.map((t) => t.date);
+
+  const seriesBTC: number[] = [];
+  const seriesInvested: number[] = [];
+  const seriesAvgPrice: number[] = [];
+  const seriesValueNow: number[] = [];
+  const seriesPnL: number[] = [];
+  const seriesROI: number[] = [];
+  const seriesDrawdown: number[] = [];
+
+  let accBTC = 0;
+  let accInvested = 0;
+  let peakValue = 0;
+
+  sorted.forEach((t) => {
+    accBTC += t.amountBTC;
+    accInvested += t.totalEUR;
+
+    const avg = accBTC > 0 ? accInvested / accBTC : 0;
+    const valueNow = accBTC * currentPrice;
+    const pnlNow = valueNow - accInvested;
+    const roiNow = accInvested > 0 ? (pnlNow / accInvested) * 100 : 0;
+
+    peakValue = Math.max(peakValue, valueNow);
+    const dd = peakValue > 0 ? ((valueNow - peakValue) / peakValue) * 100 : 0;
+
+    seriesBTC.push(accBTC);
+    seriesInvested.push(accInvested);
+    seriesAvgPrice.push(avg);
+    seriesValueNow.push(valueNow);
+    seriesPnL.push(pnlNow);
+    seriesROI.push(roiNow);
+    seriesDrawdown.push(dd);
+  });
+
+  const mainChartData = {
+    labels,
+    datasets: [
+      {
+        label: "BTC acumulado",
+        data: seriesBTC,
+        borderColor: "#22c55e",
+        backgroundColor: "rgba(34,197,94,0.15)",
+        tension: 0.3,
+        yAxisID: "y1",
+      },
+      {
+        label: "Capital Investido (€)",
+        data: seriesInvested,
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59,130,246,0.12)",
+        tension: 0.3,
+        yAxisID: "y",
+      },
+      {
+        label: "Preço Médio (€)",
+        data: seriesAvgPrice,
+        borderColor: "#a855f7",
+        backgroundColor: "rgba(168,85,247,0.15)",
+        tension: 0.3,
+        yAxisID: "y",
+      },
+      {
+        label: "Valor Atual (€)",
+        data: seriesValueNow,
+        borderColor: "#f7931a",
+        backgroundColor: "rgba(247,147,26,0.15)",
+        tension: 0.3,
+        yAxisID: "y",
+      },
+    ],
+  };
+
+  const mainChartOptions = {
+    plugins: {
+      legend: {
+        labels: { color: "#fff" },
+      },
+    },
+    scales: {
+      x: {
+        type: "category" as const,
+        ticks: { color: "#aaa" },
+        grid: { color: "rgba(255,255,255,0.05)" },
+      },
+      y: {
+        type: "linear" as const,
+        position: "left" as const,
+        ticks: { color: "#aaa" },
+        grid: { color: "rgba(255,255,255,0.05)" },
+      },
+      y1: {
+        type: "linear" as const,
+        position: "right" as const,
+        ticks: { color: "#22c55e" },
+        grid: { display: false },
+      },
+    },
+  };
+
+  const riskChartData = {
+    labels,
+    datasets: [
+      {
+        label: "P&L não realizado (€)",
+        data: seriesPnL,
+        borderColor: "#f97316",
+        backgroundColor: "rgba(249,115,22,0.15)",
+        tension: 0.3,
+        yAxisID: "y",
+      },
+      {
+        label: "ROI não realizado (%)",
+        data: seriesROI,
+        borderColor: "#22c55e",
+        backgroundColor: "rgba(34,197,94,0.15)",
+        tension: 0.3,
+        yAxisID: "y1",
+      },
+      {
+        label: "Drawdown (%)",
+        data: seriesDrawdown,
+        borderColor: "#f43f5e",
+        backgroundColor: "rgba(244,63,94,0.15)",
+        tension: 0.3,
+        yAxisID: "y1",
+      },
+    ],
+  };
+
+  const riskChartOptions = {
+    plugins: {
+      legend: {
+        labels: { color: "#fff" },
+      },
+    },
+    scales: {
+      x: {
+        type: "category" as const,
+        ticks: { color: "#aaa" },
+        grid: { color: "rgba(255,255,255,0.05)" },
+      },
+      y: {
+        type: "linear" as const,
+        position: "left" as const,
+        ticks: { color: "#aaa" },
+        grid: { color: "rgba(255,255,255,0.05)" },
+      },
+      y1: {
+        type: "linear" as const,
+        position: "right" as const,
+        ticks: { color: "#f97316" },
+        grid: { display: false },
+      },
+    },
+  };
+
+  const insights = [
+    {
+      label: "Posição vs preço atual",
+      text:
+        totalBTC === 0
+          ? "Ainda não tens BTC registado no portfolio."
+          : currentPrice > avgPrice
+          ? "O preço atual está acima do teu custo médio — posição confortável."
+          : "O preço atual está abaixo do teu custo médio — acumulação em desconto.",
+    },
+    {
+      label: "Lucro / Prejuízo não realizado",
+      text:
+        pnl >= 0
+          ? `Estás com um lucro não realizado de ${pnl.toFixed(
+              2
+            )} € (${roi.toFixed(2)}%).`
+          : `Estás com um prejuízo não realizado de ${pnl.toFixed(
+              2
+            )} € (${roi.toFixed(2)}%).`,
+    },
+    {
+      label: "Exposição",
+      text:
+        totalBTC > 0
+          ? `Tens ${totalBTC.toFixed(8)} BTC acumulados.`
+          : "Ainda não tens exposição registada.",
+    },
+  ];
+
   return (
-    <>
-      <h1 style={{ fontSize: 36, marginBottom: 20 }}>Portfolio</h1>
+    <div style={styles.page}>
+      <h1 style={styles.title}>Portfolio</h1>
 
-      <button
-        onClick={() => setShowAdd(true)}
-        style={{
-          padding: "12px 20px",
-          background: "#f7931a",
-          border: "none",
-          borderRadius: 8,
-          cursor: "pointer",
-          fontWeight: "bold",
-          color: "#000",
-          marginBottom: 30,
-        }}
-      >
-        + Adicionar Transação
-      </button>
-
-      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-        <Card label="Total BTC" value={totalBTC.toFixed(8)} />
-        <Card label="Total Investido" value={`$${totalInvested.toLocaleString()}`} />
-        <Card label="Preço Médio" value={`$${avgPrice.toLocaleString()}`} />
-        <Card label="Valor Atual" value={`$${currentValue.toLocaleString()}`} />
-        <Card label="P&L" value={`$${pnl.toLocaleString()}`} />
-        <Card label="ROI" value={`${roi.toFixed(2)}%`} />
+      <div style={styles.cardGrid}>
+        <Card label="Total BTC" value={`${totalBTC.toFixed(8)} BTC`} />
+        <Card label="Total Investido" value={`${totalInvested.toFixed(2)} €`} />
+        <Card label="Preço Médio" value={`${avgPrice.toFixed(2)} €`} />
+        <Card label="Valor Atual" value={`${currentValue.toFixed(2)} €`} />
+        <Card
+          label="P&L Não Realizado"
+          value={`${pnl.toFixed(2)} €`}
+          color={pnl >= 0 ? "#22c55e" : "#f43f5e"}
+        />
+        <Card
+          label="ROI Não Realizado"
+          value={`${roi.toFixed(2)} %`}
+          color={roi >= 0 ? "#22c55e" : "#f43f5e"}
+        />
       </div>
 
-      <h2 style={{ marginTop: 40 }}>Transações</h2>
+      {transactions.length > 0 && (
+        <>
+          <h2 style={styles.sectionTitle}>Evolução do Portfolio</h2>
+          <div style={styles.chartCard}>
+            <Line data={mainChartData} options={mainChartOptions as any} />
+          </div>
 
-      {transactions.length === 0 ? (
-        <p style={{ color: "#aaa" }}>Nenhuma transação registada.</p>
-      ) : (
-        <table style={{ marginTop: 20, width: "100%", color: "#fff" }}>
-          <thead>
-            <tr style={{ textAlign: "left", color: "#aaa" }}>
-              <th>Data</th>
-              <th>BTC</th>
-              <th>Preço USD</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((t) => (
-              <tr key={t.id}>
-                <td>{t.date}</td>
-                <td>{t.amountBTC}</td>
-                <td>${t.priceUSD.toLocaleString()}</td>
-                <td>
-                  <button
-                    onClick={() => setEditTx(t)}
-                    style={editBtn}
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    onClick={() => setDeleteId(t.id)}
-                    style={deleteBtn}
-                  >
-                    Remover
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <h2 style={styles.sectionTitle}>Risco, P&L e Drawdown</h2>
+          <div style={styles.chartCard}>
+            <Line data={riskChartData} options={riskChartOptions as any} />
+          </div>
+        </>
       )}
 
-      {showAdd && (
-        <TransactionFormModal
-          onClose={() => setShowAdd(false)}
-          onSubmit={(tx) => {
-            addTransaction({
-              id: crypto.randomUUID(),
-              ...tx,
-            });
-            setShowAdd(false);
-          }}
-        />
-      )}
-
-      {editTx && (
-        <TransactionFormModal
-          initial={editTx}
-          onClose={() => setEditTx(null)}
-          onSubmit={(tx) => {
-            editTransaction({
-              id: editTx.id,
-              ...tx,
-            });
-            setEditTx(null);
-          }}
-        />
-      )}
-
-      {deleteId && (
-        <ConfirmDeleteModal
-          onClose={() => setDeleteId(null)}
-          onConfirm={() => {
-            removeTransaction(deleteId);
-            setDeleteId(null);
-          }}
-        />
-      )}
-    </>
+      <h2 style={styles.sectionTitle}>Insights</h2>
+      <div style={styles.insightsGrid}>
+        {insights.map((i) => (
+          <div key={i.label} style={styles.insightCard}>
+            <h3 style={styles.insightTitle}>{i.label}</h3>
+            <p style={styles.insightText}>{i.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
-const editBtn: React.CSSProperties = {
-  padding: "6px 12px",
-  background: "#444",
-  border: "1px solid #555",
-  borderRadius: 6,
-  color: "#fff",
-  cursor: "pointer",
-  marginRight: 10,
-};
-
-const deleteBtn: React.CSSProperties = {
-  padding: "6px 12px",
-  background: "#d9534f",
-  border: "none",
-  borderRadius: 6,
-  color: "#fff",
-  cursor: "pointer",
-};
-
-const Card = ({ label, value }: { label: string; value: string }) => (
-  <div
-    style={{
-      background: "#111",
-      padding: 20,
-      borderRadius: 12,
-      border: "1px solid #222",
-      width: 220,
-    }}
-  >
-    <p style={{ color: "#aaa", marginBottom: 8 }}>{label}</p>
-    <h2 style={{ fontSize: 26, fontWeight: "bold", color: "#f7931a" }}>{value}</h2>
+const Card = ({
+  label,
+  value,
+  color = "#f7931a",
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) => (
+  <div style={styles.card}>
+    <p style={styles.cardLabel}>{label}</p>
+    <h2 style={{ ...styles.cardValue, color }}>{value}</h2>
   </div>
 );
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    color: "#fff",
+    fontFamily: "Inter, sans-serif",
+    padding: 32,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 600,
+    marginBottom: 20,
+  },
+  cardGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 20,
+  },
+  card: {
+    background: "#0b0b0b",
+    padding: 20,
+    borderRadius: 12,
+    border: "1px solid #1f1f1f",
+  },
+  cardLabel: {
+    color: "#aaa",
+    marginBottom: 6,
+  },
+  cardValue: {
+    fontSize: 26,
+    fontWeight: 600,
+  },
+  sectionTitle: {
+    marginTop: 40,
+    fontSize: 22,
+    fontWeight: 600,
+    color: "#f7931a",
+  },
+  chartCard: {
+    marginTop: 18,
+    background: "#050505",
+    padding: 20,
+    borderRadius: 14,
+    border: "1px solid #151515",
+  },
+  insightsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: 20,
+    marginTop: 20,
+  },
+  insightCard: {
+    background: "#050505",
+    padding: 20,
+    borderRadius: 12,
+    border: "1px solid #151515",
+  },
+  insightTitle: {
+    fontSize: 18,
+    marginBottom: 8,
+    color: "#f7931a",
+  },
+  insightText: {
+    color: "#ccc",
+    lineHeight: 1.6,
+  },
+};

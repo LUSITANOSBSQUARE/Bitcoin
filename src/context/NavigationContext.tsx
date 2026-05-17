@@ -3,16 +3,17 @@ import { createContext, useContext, useState } from "react";
 //
 // 🔥 DEFINIÇÃO COMPLETA DAS PÁGINAS
 // — Inclui todas as páginas reais do teu projeto
-// — Inclui o TradeCopilot
+// — Inclui o Ledger
 //
 export type Page =
   | "home"
   | "dashboard"
+  | "market"
   | "portfolio"
-  | "trades"
+  | "ledger"        // ⭐ NOVO
   | "capital"
-  | "tradecopilot"
-  | "market";
+  | "trades"
+  | "tradecopilot";
 
 //
 // 🔥 TIPO DO CONTEXTO

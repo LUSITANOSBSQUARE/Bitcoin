@@ -56,14 +56,15 @@ export const HomePage = () => {
 
         <p style={subtitle}>{marketText}</p>
 
-        {/* ⭐ NAVIGATION BUTTONS (COM CAPITAL + COPILOT) */}
+        {/* ⭐ NAVIGATION BUTTONS (COM LEDGER E ORDEM CORRETA) */}
         <div style={buttonRow}>
           {premiumButton("Dashboard", () => navigate("dashboard"))}
+          {premiumButton("Mercado", () => navigate("market"))}
           {premiumButton("Portfolio", () => navigate("portfolio"))}
+          {premiumButton("Ledger", () => navigate("ledger"))}        {/* ⭐ NOVO */}
           {premiumButton("Capital", () => navigate("capital"))}
           {premiumButton("Trades", () => navigate("trades"))}
-          {premiumButton("Mercado", () => navigate("market"))}
-          {premiumButton("Copilot", () => navigate("tradecopilot"))} {/* ⭐ NOVO */}
+          {premiumButton("Copilot", () => navigate("tradecopilot"))}
         </div>
 
         <button
@@ -268,4 +269,4 @@ const footer: React.CSSProperties = {
   letterSpacing: 1,
   marginTop: 28,
 };
-                                                                    
+                                                            

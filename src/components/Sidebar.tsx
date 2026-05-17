@@ -42,6 +42,7 @@ export const Sidebar = () => {
     >
       {!hidden && (
         <>
+          {/* LOGO */}
           <div
             style={{
               fontSize: 32,
@@ -53,13 +54,15 @@ export const Sidebar = () => {
             ₿ Engine
           </div>
 
+          {/* ORDEM LÓGICA */}
           {menuItem("Home", "home")}
           {menuItem("Dashboard", "dashboard")}
           {menuItem("Mercado", "market")}
           {menuItem("Portfolio", "portfolio")}
-          {menuItem("Capital", "capital")}   {/* ⭐ NOVO */}
+          {menuItem("Ledger", "ledger")}        {/* ⭐ NOVO E NO SÍTIO CERTO */}
+          {menuItem("Capital", "capital")}
           {menuItem("Trades", "trades")}
-          {menuItem("Copilot", "tradecopilot")} 
+          {menuItem("Copilot", "tradecopilot")}
         </>
       )}
     </div>

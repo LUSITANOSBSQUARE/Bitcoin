@@ -1,17 +1,20 @@
 import { Sidebar } from "../components/Sidebar";
 import { useNavigation } from "../context/NavigationContext";
 
+/* ⭐ IMPORTA TODAS AS PÁGINAS */
 import { HomePage } from "../pages/HomePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PortfolioPage } from "../pages/PortfolioPage";
+import { LedgerPage } from "../pages/LedgerPage";          // ⭐ NOVO
 import { TradesPage } from "../pages/TradesPage";
 import { MarketPage } from "../pages/MarketPage";
 import { CapitalControlPage } from "../pages/CapitalControlPage";
-import { TradeCopilotPage } from "../pages/TradeCopilotPage"; // ⭐ NOVO
+import { TradeCopilotPage } from "../pages/TradeCopilotPage";
 
 export const MainLayout = () => {
   const { page } = useNavigation();
 
+  /* ⭐ ROUTER INTERNO */
   const renderPage = () => {
     switch (page) {
       case "home":
@@ -20,8 +23,14 @@ export const MainLayout = () => {
       case "dashboard":
         return <DashboardPage />;
 
+      case "market":
+        return <MarketPage />;
+
       case "portfolio":
         return <PortfolioPage />;
+
+      case "ledger":                     // ⭐ NOVO
+        return <LedgerPage />;
 
       case "capital":
         return <CapitalControlPage />;
@@ -29,10 +38,7 @@ export const MainLayout = () => {
       case "trades":
         return <TradesPage />;
 
-      case "market":
-        return <MarketPage />;
-
-      case "tradecopilot": // ⭐ NOVO
+      case "tradecopilot":
         return <TradeCopilotPage />;
 
       default:
@@ -67,4 +73,4 @@ export const MainLayout = () => {
     </div>
   );
 };
-                                                                               
+                                                                      

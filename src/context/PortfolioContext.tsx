@@ -4,7 +4,8 @@ export type Transaction = {
   id: string;
   date: string;
   amountBTC: number;
-  priceUSD: number;
+  totalEUR: number;   // ⭐ valor total pago
+  priceEUR: number;   // ⭐ preço por BTC calculado
 };
 
 export type PortfolioContextType = {
@@ -13,7 +14,6 @@ export type PortfolioContextType = {
   editTransaction: (tx: Transaction) => void;
   removeTransaction: (id: string) => void;
 
-  // 🔥 CAMPOS CALCULADOS
   totalBTC: number;
   totalInvested: number;
   avgPrice: number;
@@ -64,20 +64,19 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // 🔥 CÁLCULOS AUTOMÁTICOS
+  // Cálculos
   const totalBTC = useMemo(
     () => transactions.reduce((s, t) => s + t.amountBTC, 0),
     [transactions]
   );
 
   const totalInvested = useMemo(
-    () => transactions.reduce((s, t) => s + t.amountBTC * t.priceUSD, 0),
+    () => transactions.reduce((s, t) => s + t.totalEUR, 0),
     [transactions]
   );
 
   const avgPrice = totalBTC > 0 ? totalInvested / totalBTC : 0;
 
-  // 🔥 Lucro realizado (por agora 0 — podes evoluir isto depois)
   const realizedProfit = 0;
 
   return (

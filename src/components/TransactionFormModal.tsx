@@ -1,16 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 
 type Props = {
   onClose: () => void;
   onSubmit: (tx: {
     date: string;
     amountBTC: number;
-    priceUSD: number;
+    totalEUR: number;
+    priceEUR: number;
   }) => void;
   initial?: {
     date: string;
     amountBTC: number;
-    priceUSD: number;
+    totalEUR: number;
+    priceEUR: number;
   };
 };
 
@@ -23,9 +25,17 @@ export const TransactionFormModal: React.FC<Props> = ({
   const [amountBTC, setAmountBTC] = useState(
     initial?.amountBTC?.toString() || ""
   );
-  const [priceUSD, setPriceUSD] = useState(
-    initial?.priceUSD?.toString() || ""
+  const [totalEUR, setTotalEUR] = useState(
+    initial?.totalEUR?.toString() || ""
   );
+
+  // 🔥 Preço calculado automaticamente
+  const priceEUR = useMemo(() => {
+    const btc = Number(amountBTC);
+    const eur = Number(totalEUR);
+    if (!btc || !eur) return 0;
+    return eur / btc;
+  }, [amountBTC, totalEUR]);
 
   return (
     <div
@@ -52,7 +62,8 @@ export const TransactionFormModal: React.FC<Props> = ({
           {initial ? "Editar Transação" : "Adicionar Transação"}
         </h2>
 
-        <label style={{ color: "#aaa" }}>Data</label>
+        {/* DATA */}
+        <label style={labelStyle}>Data</label>
         <input
           type="date"
           value={date}
@@ -60,7 +71,8 @@ export const TransactionFormModal: React.FC<Props> = ({
           style={inputStyle}
         />
 
-        <label style={{ color: "#aaa" }}>Quantidade BTC</label>
+        {/* BTC */}
+        <label style={labelStyle}>Quantidade BTC</label>
         <input
           type="number"
           step="0.00000001"
@@ -69,19 +81,24 @@ export const TransactionFormModal: React.FC<Props> = ({
           style={inputStyle}
         />
 
-        <label style={{ color: "#aaa" }}>Preço USD</label>
+        {/* TOTAL EUR */}
+        <label style={labelStyle}>Valor total pago (€)</label>
         <input
           type="number"
-          value={priceUSD}
-          onChange={(e) => setPriceUSD(e.target.value)}
+          value={totalEUR}
+          onChange={(e) => setTotalEUR(e.target.value)}
           style={inputStyle}
         />
 
+        {/* PREÇO CALCULADO */}
+        <label style={labelStyle}>Preço por BTC (calculado)</label>
+        <div style={calculatedBox}>
+          {priceEUR > 0 ? `${priceEUR.toFixed(2)} €` : "—"}
+        </div>
+
+        {/* BOTÕES */}
         <div style={{ display: "flex", gap: 10, marginTop: 25 }}>
-          <button
-            onClick={onClose}
-            style={cancelBtn}
-          >
+          <button onClick={onClose} style={cancelBtn}>
             Cancelar
           </button>
 
@@ -90,7 +107,8 @@ export const TransactionFormModal: React.FC<Props> = ({
               onSubmit({
                 date,
                 amountBTC: Number(amountBTC),
-                priceUSD: Number(priceUSD),
+                totalEUR: Number(totalEUR),
+                priceEUR: Number(priceEUR),
               })
             }
             style={saveBtn}
@@ -103,15 +121,34 @@ export const TransactionFormModal: React.FC<Props> = ({
   );
 };
 
+/* ---------------- STYLES ---------------- */
+
+const labelStyle: React.CSSProperties = {
+  color: "#aaa",
+  marginBottom: 6,
+  marginTop: 10,
+  display: "block",
+};
+
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  marginTop: 6,
-  marginBottom: 18,
+  marginBottom: 14,
   background: "#000",
   border: "1px solid #333",
   borderRadius: 8,
   color: "#fff",
+};
+
+const calculatedBox: React.CSSProperties = {
+  width: "100%",
+  padding: "12px",
+  background: "#000",
+  border: "1px solid #333",
+  borderRadius: 8,
+  color: "#f7931a",
+  fontWeight: "bold",
+  marginBottom: 18,
 };
 
 const cancelBtn: React.CSSProperties = {
