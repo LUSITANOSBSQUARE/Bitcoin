@@ -5,12 +5,102 @@ import { useBitcoinData } from "../hooks/useBitcoinData";
 import { useOnChainData } from "../hooks/useOnChainData";
 import { useFearGreed } from "../hooks/useFearGreed";
 import { useBTCDominance } from "../hooks/useBTCDominance";
+
 import { useMarketIntelligence } from "../engine/useMarketIntelligence";
+import { useTimeframeAnalysis } from "../hooks/useTimeframeAnalysis";
+import { useMarketStrength } from "../hooks/useMarketStrength";
 
 import { useTradeCopilot } from "../hooks/useTradeCopilot";
 import type { TradeAlert, TradeSetup } from "../hooks/useTradeCopilot";
 
 import { useAlerts } from "../context/AlertsContext";
+import { TimeframePanel } from "../components/TimeframePanel";
+import { MarketStrengthPanel } from "../components/MarketStrengthPanel";
+
+const orange = "#f7931a";
+const dark = "#0b0b0b";
+
+/* ---------- RISK SIMULATION (FUNÇÃO PURA) ---------- */
+
+type RiskResult = {
+  positionSize: number;
+  riskAmount: number;
+  riskPercent: number;
+  liquidationPrice: number | null;
+  marginRequired: number;
+  exposureAfter: number;
+};
+
+const simulateRisk = (
+  setup: TradeSetup,
+  capital: number,
+  maxRiskPercent: number,
+  price: number
+): RiskResult => {
+  const invalidation = parseFloat(setup.invalidation);
+  const levMatch = setup.leverage.match(/(\d+(\.\d+)?)/);
+  const leverage = levMatch ? parseFloat(levMatch[1]) : 1;
+
+  const riskAmount = (capital * maxRiskPercent) / 100;
+  const distance = Math.abs(price - invalidation);
+  const positionSize = distance > 0 ? riskAmount / distance : 0;
+  const marginRequired = leverage > 0 ? positionSize * price / leverage : 0;
+
+  const liquidationPrice =
+    leverage > 0
+      ? setup.direction === "long"
+        ? price - price / leverage
+        : price + price / leverage
+      : null;
+
+  const exposureAfter = capital > 0 ? (marginRequired / capital) * 100 : 0;
+
+  return {
+    positionSize,
+    riskAmount,
+    riskPercent: maxRiskPercent,
+    liquidationPrice,
+    marginRequired,
+    exposureAfter,
+  };
+};
+
+/* ---------- RISK PANEL (INLINE COMPONENT) ---------- */
+
+const RiskPanel = ({ risk }: { risk: RiskResult }) => (
+  <div style={styles.riskBox}>
+    <div style={styles.riskHeader}>Simulação de risco</div>
+
+    <div style={styles.riskRow}>
+      <span>Tamanho da posição</span>
+      <strong>{risk.positionSize.toFixed(4)} BTC</strong>
+    </div>
+
+    <div style={styles.riskRow}>
+      <span>Risco por trade</span>
+      <strong>{risk.riskAmount.toFixed(2)} USDT</strong>
+    </div>
+
+    <div style={styles.riskRow}>
+      <span>Margem necessária</span>
+      <strong>{risk.marginRequired.toFixed(2)} USDT</strong>
+    </div>
+
+    <div style={styles.riskRow}>
+      <span>Exposição após entrada</span>
+      <strong>{risk.exposureAfter.toFixed(1)}%</strong>
+    </div>
+
+    <div style={styles.riskRow}>
+      <span>Liquidação estimada</span>
+      <strong>
+        {risk.liquidationPrice ? `${risk.liquidationPrice.toFixed(0)} USDT` : "—"}
+      </strong>
+    </div>
+  </div>
+);
+
+/* ---------- PAGE ---------- */
 
 export const TradeCopilotPage = () => {
   const market = useBitcoinData();
@@ -19,11 +109,15 @@ export const TradeCopilotPage = () => {
   const dominance = useBTCDominance();
 
   const intel = useMarketIntelligence(market, onchain, fearGreed, dominance);
-  const { setups, alerts } = useTradeCopilot({ market, intel });
+  const tf = useTimeframeAnalysis(market, intel);
+  const ms = useMarketStrength(intel);
 
+  const { setups, alerts } = useTradeCopilot({ market, intel });
   const { alerts: persistentAlerts, pushAlert, dismissAlert } = useAlerts();
 
   const price = market?.priceUSD ?? market?.priceEUR ?? 0;
+  const capital = 1000; // aqui podes ligar ao teu CapitalContext
+  const maxRiskPercent = 1; // risco por trade
 
   useEffect(() => {
     alerts.forEach((a) => {
@@ -33,9 +127,11 @@ export const TradeCopilotPage = () => {
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>
-        Trade Copilot <span style={styles.v2}>v2.5</span>
-      </h1>
+      {/* HEADER PRINCIPAL */}
+      <div style={styles.headerMain}>
+        <h1 style={styles.engineTitle}>Capsule Trade Engine</h1>
+        <div style={styles.engineSubtitle}>Copilot</div>
+      </div>
 
       {/* ALERTAS PERSISTENTES */}
       {persistentAlerts.length > 0 && (
@@ -64,7 +160,7 @@ export const TradeCopilotPage = () => {
         </div>
       )}
 
-      {/* HEADER */}
+      {/* INFO RÁPIDA */}
       <div style={styles.headerRow}>
         <div>
           <div style={styles.label}>BTC/USDT</div>
@@ -75,83 +171,99 @@ export const TradeCopilotPage = () => {
         <div>
           <div style={styles.label}>Estado do mercado</div>
           <div style={styles.valueSmall}>
-            {intel ? intel.marketState : "A analisar contexto..."}
+            {intel ? intel.marketState : "A analisar..."}
           </div>
         </div>
       </div>
+
+      {/* PAINEL MULTI‑TIMEFRAME */}
+      {tf && <TimeframePanel tf={tf} />}
+
+      {/* PAINEL DE FORÇA DO MERCADO */}
+      {ms && <MarketStrengthPanel ms={ms} />}
 
       <div style={styles.separator} />
 
       {/* SEM SETUPS */}
       {setups.length === 0 && (
-        <div style={styles.empty}>
-          Sem setups claros neste momento.  
-          O Copilot está à espera de condições com melhor assimetria risco/retorno.
+        <div style={styles.noSetupsBox}>
+          <h3 style={styles.noSetupsTitle}>Sem setups no momento</h3>
+          <p style={styles.noSetupsText}>
+            O Capsule Trade Engine não encontra edge suficiente neste contexto.
+            Aguardar melhor alinhamento entre 1H, 4H e Diário.
+          </p>
         </div>
       )}
 
       {/* SETUPS */}
-      {setups.map((s: TradeSetup) => (
-        <div key={s.id} style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.cardTitle}>{s.title}</span>
-            <span style={{ ...styles.badge, ...badgeColor[s.type] }}>{s.type}</span>
+      {setups.map((s: TradeSetup) => {
+        const risk =
+          price > 0
+            ? simulateRisk(s, capital, maxRiskPercent, price)
+            : null;
+
+        return (
+          <div key={s.id} style={styles.card}>
+            <div style={styles.cardHeader}>
+              <span style={styles.cardTitle}>{s.title}</span>
+              <span style={{ ...styles.badge, ...badgeColor[s.type] }}>
+                {s.type}
+              </span>
+            </div>
+
+            <div style={styles.thesis}>{s.thesis}</div>
+
+            <div style={styles.confidenceBarWrapper}>
+              <div
+                style={{
+                  ...styles.confidenceBarFill,
+                  width: `${s.confidence}%`,
+                }}
+              />
+            </div>
+            <div style={styles.confidenceText}>
+              Confiança: {s.confidence.toFixed(0)}%
+            </div>
+
+            <div style={styles.row}>
+              <span>Direção</span>
+              <span style={styles.value}>{s.direction.toUpperCase()}</span>
+            </div>
+
+            <div style={styles.row}>
+              <span>Entrada</span>
+              <span style={styles.value}>{s.entryZone}</span>
+            </div>
+
+            <div style={styles.row}>
+              <span>Invalidation</span>
+              <span style={styles.value}>{s.invalidation}</span>
+            </div>
+
+            <div style={styles.row}>
+              <span>Alvo</span>
+              <span style={styles.value}>{s.targetZone}</span>
+            </div>
+
+            <div style={styles.row}>
+              <span>Alavancagem</span>
+              <span style={styles.value}>{s.leverage}</span>
+            </div>
+
+            <div style={styles.subLabel}>Condições</div>
+            <div style={styles.conditions}>{s.conditions.join(" · ")}</div>
+
+            <div style={styles.riskNote}>{s.riskNote}</div>
+
+            {risk && <RiskPanel risk={risk} />}
           </div>
-
-          <div style={styles.thesis}>{s.thesis}</div>
-
-          {/* Barra de confiança */}
-          <div style={styles.confidenceBarWrapper}>
-            <div
-              style={{
-                ...styles.confidenceBarFill,
-                width: `${s.confidence}%`,
-              }}
-            />
-          </div>
-          <div style={styles.confidenceText}>
-            Confiança: {s.confidence.toFixed(0)}%
-          </div>
-
-          <div style={styles.row}>
-            <span>Direção</span>
-            <span style={styles.value}>{s.direction.toUpperCase()}</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Entrada (USDT)</span>
-            <span style={styles.value}>{s.entryZone}</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Invalidation</span>
-            <span style={styles.value}>{s.invalidation}</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Alvo</span>
-            <span style={styles.value}>{s.targetZone}</span>
-          </div>
-
-          <div style={styles.row}>
-            <span>Alavancagem</span>
-            <span style={styles.value}>{s.leverage}</span>
-          </div>
-
-          <div style={styles.subLabel}>Condições</div>
-          <div style={styles.conditions}>{s.conditions.join(" · ")}</div>
-
-          <div style={styles.riskNote}>{s.riskNote}</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
 
 /* ---------------- STYLES ---------------- */
-
-const orange = "#f7931a";
-const dark = "#0b0b0b";
 
 const styles: Record<string, CSSProperties> = {
   page: {
@@ -161,16 +273,23 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: 960,
     margin: "0 auto",
   },
-  title: {
-    fontSize: 32,
-    marginBottom: 20,
-    fontWeight: 700,
+
+  headerMain: {
+    marginBottom: 24,
+  },
+  engineTitle: {
+    fontSize: 40,
+    fontWeight: 800,
     color: orange,
+    letterSpacing: 1,
   },
-  v2: {
-    fontSize: 18,
-    opacity: 0.7,
+  engineSubtitle: {
+    fontSize: 15,
+    opacity: 0.6,
+    marginTop: -8,
+    marginLeft: 4,
   },
+
   alertsPanel: {
     marginBottom: 20,
     display: "flex",
@@ -210,6 +329,7 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(239,68,68,0.12)",
     borderColor: "rgba(239,68,68,0.5)",
   },
+
   headerRow: {
     display: "flex",
     gap: 40,
@@ -232,11 +352,26 @@ const styles: Record<string, CSSProperties> = {
     borderTop: "1px solid #1f1f1f",
     margin: "18px 0",
   },
-  empty: {
-    fontSize: 14,
-    color: "#888",
-    marginTop: 10,
+
+  noSetupsBox: {
+    background: "#111",
+    border: "1px solid #222",
+    padding: 18,
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 16,
   },
+  noSetupsTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: orange,
+    marginBottom: 6,
+  },
+  noSetupsText: {
+    opacity: 0.85,
+    fontSize: 13,
+  },
+
   card: {
     background: dark,
     border: "1px solid #1f1f1f",
@@ -307,6 +442,26 @@ const styles: Record<string, CSSProperties> = {
     color: "#f97316",
     marginTop: 10,
   },
+
+  riskBox: {
+    background: "#111",
+    border: "1px solid #222",
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 14,
+  },
+  riskHeader: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: orange,
+    marginBottom: 8,
+  },
+  riskRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 13,
+    padding: "2px 0",
+  },
 };
 
 const badgeColor: Record<string, CSSProperties> = {
@@ -315,4 +470,3 @@ const badgeColor: Record<string, CSSProperties> = {
   breakout: { background: "rgba(239,68,68,0.15)", color: "#ef4444" },
   defensive: { background: "rgba(234,179,8,0.15)", color: "#eab308" },
 };
-    

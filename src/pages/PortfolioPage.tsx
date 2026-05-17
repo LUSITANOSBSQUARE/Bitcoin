@@ -20,7 +20,8 @@ export const PortfolioPage = () => {
   );
 
   const avgPrice = totalBTC > 0 ? totalInvested / totalBTC : 0;
-  const currentValue = data ? totalBTC * data.price : 0;
+  const currentValue = data ? totalBTC * data.priceEUR : 0;
+
   const pnl = currentValue - totalInvested;
   const roi = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
 
