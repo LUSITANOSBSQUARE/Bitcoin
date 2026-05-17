@@ -1,41 +1,33 @@
 import React, { useState, useMemo } from "react";
+import type { LedgerEntryType } from "../context/LedgerContext";
 
 type Props = {
   onClose: () => void;
-  onSubmit: (tx: {
+  onSubmit: (entry: {
+    type: LedgerEntryType;
     date: string;
     amountBTC: number;
-    totalEUR: number;
+    amountEUR: number;
     priceEUR: number;
   }) => void;
-  initial?: {
-    date: string;
-    amountBTC: number;
-    totalEUR: number;
-    priceEUR: number;
-  };
 };
 
 export const TransactionFormModal: React.FC<Props> = ({
   onClose,
   onSubmit,
-  initial,
 }) => {
-  const [date, setDate] = useState(initial?.date || "");
-  const [amountBTC, setAmountBTC] = useState(
-    initial?.amountBTC?.toString() || ""
-  );
-  const [totalEUR, setTotalEUR] = useState(
-    initial?.totalEUR?.toString() || ""
-  );
+  const [type, setType] = useState<LedgerEntryType>("BUY");
+  const [date, setDate] = useState("");
+  const [amountBTC, setAmountBTC] = useState("");
+  const [amountEUR, setAmountEUR] = useState("");
 
   // 🔥 Preço calculado automaticamente
   const priceEUR = useMemo(() => {
     const btc = Number(amountBTC);
-    const eur = Number(totalEUR);
+    const eur = Number(amountEUR);
     if (!btc || !eur) return 0;
     return eur / btc;
-  }, [amountBTC, totalEUR]);
+  }, [amountBTC, amountEUR]);
 
   return (
     <div
@@ -58,11 +50,20 @@ export const TransactionFormModal: React.FC<Props> = ({
           border: "1px solid #222",
         }}
       >
-        <h2 style={{ color: "#fff", marginBottom: 20 }}>
-          {initial ? "Editar Transação" : "Adicionar Transação"}
-        </h2>
+        <h2 style={{ color: "#fff", marginBottom: 20 }}>Adicionar Transação</h2>
 
-        {/* DATA */}
+        {/* TYPE */}
+        <label style={labelStyle}>Tipo</label>
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as LedgerEntryType)}
+          style={inputStyle}
+        >
+          <option value="BUY">Compra (BUY)</option>
+          <option value="SELL">Venda (SELL)</option>
+        </select>
+
+        {/* DATE */}
         <label style={labelStyle}>Data</label>
         <input
           type="date"
@@ -81,12 +82,12 @@ export const TransactionFormModal: React.FC<Props> = ({
           style={inputStyle}
         />
 
-        {/* TOTAL EUR */}
-        <label style={labelStyle}>Valor total pago (€)</label>
+        {/* EUR */}
+        <label style={labelStyle}>Valor total (€)</label>
         <input
           type="number"
-          value={totalEUR}
-          onChange={(e) => setTotalEUR(e.target.value)}
+          value={amountEUR}
+          onChange={(e) => setAmountEUR(e.target.value)}
           style={inputStyle}
         />
 
@@ -105,9 +106,10 @@ export const TransactionFormModal: React.FC<Props> = ({
           <button
             onClick={() =>
               onSubmit({
+                type,
                 date,
                 amountBTC: Number(amountBTC),
-                totalEUR: Number(totalEUR),
+                amountEUR: Number(amountEUR),
                 priceEUR: Number(priceEUR),
               })
             }

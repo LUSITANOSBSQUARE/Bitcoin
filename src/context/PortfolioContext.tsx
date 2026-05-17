@@ -1,97 +1,71 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useMemo } from "react";
+import { useLedger } from "./LedgerContext";
 
-export type Transaction = {
-  id: string;
-  date: string;
-  amountBTC: number;
-  totalEUR: number;   // ⭐ valor total pago
-  priceEUR: number;   // ⭐ preço por BTC calculado
-};
-
-export type PortfolioContextType = {
-  transactions: Transaction[];
-  addTransaction: (tx: Transaction) => void;
-  editTransaction: (tx: Transaction) => void;
-  removeTransaction: (id: string) => void;
-
+export interface PortfolioContextType {
   totalBTC: number;
   totalInvested: number;
-  avgPrice: number;
   realizedProfit: number;
-};
-
-const STORAGE_KEY = "btc_engine_portfolio";
+  averagePrice: number;
+}
 
 const PortfolioContext = createContext<PortfolioContextType | null>(null);
 
-export const PortfolioProvider = ({ children }: { children: React.ReactNode }) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { entries } = useLedger();
 
-  // Carregar do localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Transaction[];
-        if (Array.isArray(parsed)) setTransactions(parsed);
+  const portfolio = useMemo(() => {
+    let totalBTC = 0;
+    let totalInvested = 0;
+    let realizedProfit = 0;
+
+    const buyLots: { btc: number; eur: number }[] = [];
+
+    for (const e of entries) {
+      if (e.type === "BUY") {
+        totalBTC += e.amountBTC ?? 0;
+        totalInvested += e.amountEUR;
+        buyLots.push({ btc: e.amountBTC ?? 0, eur: e.amountEUR });
       }
-    } catch (err) {
-      console.error("Erro ao carregar portfolio:", err);
+
+      if (e.type === "SELL") {
+        let btcToSell = e.amountBTC ?? 0;
+        let costBasis = 0;
+
+        while (btcToSell > 0 && buyLots.length > 0) {
+          const lot = buyLots[0];
+
+          if (lot.btc <= btcToSell) {
+            costBasis += lot.eur;
+            btcToSell -= lot.btc;
+            buyLots.shift();
+          } else {
+            const ratio = btcToSell / lot.btc;
+            costBasis += lot.eur * ratio;
+            lot.eur -= lot.eur * ratio;
+            lot.btc -= btcToSell;
+            btcToSell = 0;
+          }
+        }
+
+        realizedProfit += e.amountEUR - costBasis;
+        totalBTC -= e.amountBTC ?? 0;
+      }
     }
-  }, []);
 
-  // Guardar no localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-    } catch (err) {
-      console.error("Erro ao guardar portfolio:", err);
-    }
-  }, [transactions]);
+    const averagePrice = totalBTC > 0 ? totalInvested / totalBTC : 0;
 
-  // CRUD
-  const addTransaction = (tx: Transaction) => {
-    setTransactions((prev) => [...prev, tx]);
-  };
-
-  const editTransaction = (updated: Transaction) => {
-    setTransactions((prev) =>
-      prev.map((t) => (t.id === updated.id ? updated : t))
-    );
-  };
-
-  const removeTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Cálculos
-  const totalBTC = useMemo(
-    () => transactions.reduce((s, t) => s + t.amountBTC, 0),
-    [transactions]
-  );
-
-  const totalInvested = useMemo(
-    () => transactions.reduce((s, t) => s + t.totalEUR, 0),
-    [transactions]
-  );
-
-  const avgPrice = totalBTC > 0 ? totalInvested / totalBTC : 0;
-
-  const realizedProfit = 0;
+    return {
+      totalBTC,
+      totalInvested,
+      realizedProfit,
+      averagePrice,
+    };
+  }, [entries]);
 
   return (
-    <PortfolioContext.Provider
-      value={{
-        transactions,
-        addTransaction,
-        editTransaction,
-        removeTransaction,
-        totalBTC,
-        totalInvested,
-        avgPrice,
-        realizedProfit,
-      }}
-    >
+    <PortfolioContext.Provider value={portfolio}>
       {children}
     </PortfolioContext.Provider>
   );
@@ -99,6 +73,6 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
 
 export const usePortfolio = () => {
   const ctx = useContext(PortfolioContext);
-  if (!ctx) throw new Error("usePortfolio must be used inside PortfolioProvider");
+  if (!ctx) throw new Error("usePortfolio must be inside PortfolioProvider");
   return ctx;
 };
