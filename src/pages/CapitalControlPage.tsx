@@ -1,22 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import { useCapital } from "../context/CapitalContext";
-import { usePortfolio } from "../hooks/usePortfolio";
+import { usePortfolio } from "../context/PortfolioContext";
 import { useBitcoinData } from "../hooks/useBitcoinData";
 import { useOnChainData } from "../hooks/useOnChainData";
 import { useFearGreed } from "../hooks/useFearGreed";
 import { useBTCDominance } from "../hooks/useBTCDominance";
 import { useMarketIntelligence } from "../engine/useMarketIntelligence";
 import { useCapitalEngine } from "../engine/useCapitalEngine";
+import { useCapitalPortfolioSync } from "../hooks/useCapitalPortfolioSync";
+import { FundMovementModal } from "../components/FundMovementModal";
 
 export const CapitalControlPage = () => {
+  useCapitalPortfolioSync();
+
   const {
     totalDeposited,
     availableFunds,
     usedFunds,
     deposits,
     withdrawals,
-    addFunds,
-    withdrawFunds,
+    registerDeposit,
+    registerWithdrawal,
   } = useCapital();
 
   const portfolio = usePortfolio();
@@ -32,26 +36,22 @@ export const CapitalControlPage = () => {
     dominance
   );
 
-  // FALLBACKS SEGUROS
   const btcPrice = market?.priceEUR ?? 0;
   const totalBTC = portfolio.totalBTC ?? 0;
   const currentValue = totalBTC * btcPrice;
 
-  const pnl = currentValue - usedFunds;
-  const pnlPercent = usedFunds > 0 ? (pnl / usedFunds) * 100 : 0;
+  const totalInvested = portfolio.totalInvested ?? 0;
+  const pnl = currentValue - totalInvested;
+  const pnlPercent = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
 
   const realizedProfit = portfolio.realizedProfit ?? 0;
 
-  const exposure =
-    totalDeposited > 0 ? (usedFunds / totalDeposited) * 100 : 0;
-
-  const marketIntel =
-    marketIntelRaw ?? {
-      riskScore: 50,
-      opportunityScore: 50,
-      marketState: "neutro",
-      recommendation: "neutral",
-    };
+  const marketIntel = {
+    riskScore: marketIntelRaw?.riskScore ?? 50,
+    opportunityScore: marketIntelRaw?.opportunityScore ?? 50,
+    marketState: marketIntelRaw?.marketState ?? "neutro",
+    recommendation: marketIntelRaw?.recommendation ?? "neutral",
+  };
 
   const capitalIntel = useCapitalEngine(
     {
@@ -62,256 +62,242 @@ export const CapitalControlPage = () => {
       realizedProfit,
       unrealizedProfit: pnl,
     },
-    {
-      riskScore: marketIntel.riskScore ?? 50,
-      opportunityScore: marketIntel.opportunityScore ?? 50,
-      marketState: marketIntel.marketState ?? "neutro",
-      recommendation: marketIntel.recommendation,
-    }
+    marketIntel
   );
+
+  const [modalType, setModalType] = useState<"deposit" | "withdraw" | null>(null);
+  const [fundMenuOpen, setFundMenuOpen] = useState(false);
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Centro de Controlo do Capital</h1>
-          <p style={styles.subtitle}>
-            O teu assistente financeiro para gerir exposição, liquidez e acumulação em Bitcoin.
-          </p>
-        </div>
+      {/* BOTÃO FUNDO NO TOPO */}
+      <div style={styles.topBar}>
+        <div style={{ position: "relative" }}>
+          <button
+            style={styles.walletButton}
+            onClick={() => setFundMenuOpen((v) => !v)}
+          >
+            Fundos
+          </button>
 
-        <div style={styles.headerBadge}>
-          <span style={styles.headerBadgeLabel}>Modo</span>
-          <span style={styles.headerBadgeValue}>
-            {capitalIntel.action} · {capitalIntel.intensity.toUpperCase()}
-          </span>
+          {fundMenuOpen && (
+            <div style={styles.fundMenu}>
+              <div
+                style={styles.fundMenuItem}
+                onClick={() => {
+                  setModalType("deposit");
+                  setFundMenuOpen(false);
+                }}
+              >
+                ➕ Entrada de Fundos
+              </div>
+
+              <div
+                style={styles.fundMenuItem}
+                onClick={() => {
+                  setModalType("withdraw");
+                  setFundMenuOpen(false);
+                }}
+              >
+                ➖ Saída de Fundos
+              </div>
+            </div>
+          )}
         </div>
-      </header>
+      </div>
+
+      <h1 style={styles.title}>Centro de Controlo do Capital</h1>
 
       {/* GRID PRINCIPAL */}
       <div style={styles.grid}>
-        {/* COLUNA ESQUERDA */}
-        <div style={styles.colLeft}>
-          {/* RESUMO DO CAPITAL */}
-          <div style={styles.card}>
-            <div style={styles.cardHeaderRow}>
-              <div style={styles.label}>Resumo do Capital</div>
-              <div style={styles.chip}>
-                Exposição: {exposure.toFixed(1)}%
-              </div>
-            </div>
+        <div style={styles.card}>
+          <div style={styles.label}>Resumo do Capital</div>
 
-            <div style={styles.row}>
-              <span>Dinheiro disponível</span>
-              <span style={styles.value}>{availableFunds.toFixed(2)} €</span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Dinheiro investido</span>
-              <span style={styles.value}>{usedFunds.toFixed(2)} €</span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Bitcoin comprado</span>
-              <span style={styles.value}>{totalBTC.toFixed(6)} BTC</span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Valor atual da carteira</span>
-              <span style={styles.value}>{currentValue.toFixed(2)} €</span>
-            </div>
+          <div style={styles.row}>
+            <span>Disponível</span>
+            <span style={styles.value}>{availableFunds.toFixed(2)} €</span>
           </div>
 
-          {/* PERFORMANCE REAL */}
-          <div style={styles.card}>
-            <div style={styles.label}>Performance Real</div>
-
-            <div style={styles.row}>
-              <span>PnL total</span>
-              <span
-                style={{
-                  ...styles.value,
-                  color: pnl >= 0 ? "#22c55e" : "#f43f5e",
-                }}
-              >
-                {pnl.toFixed(2)} €
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>PnL %</span>
-              <span
-                style={{
-                  ...styles.value,
-                  color: pnlPercent >= 0 ? "#22c55e" : "#f43f5e",
-                }}
-              >
-                {pnlPercent.toFixed(2)}%
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Lucros realizados</span>
-              <span style={styles.value}>{realizedProfit.toFixed(2)} €</span>
-            </div>
+          <div style={styles.row}>
+            <span>Investido (Capital)</span>
+            <span style={styles.value}>{usedFunds.toFixed(2)} €</span>
           </div>
 
-          {/* ENTRADAS E SAÍDAS */}
-          <div style={styles.card}>
-            <div style={styles.label}>Entradas e Saídas</div>
+          <div style={styles.row}>
+            <span>Total Investido (Portfolio)</span>
+            <span style={styles.value}>{totalInvested.toFixed(2)} €</span>
+          </div>
 
-            <div style={styles.subLabel}>Entradas</div>
-            {deposits.length === 0 && (
-              <div style={styles.empty}>Sem entradas registadas</div>
-            )}
-            {deposits.map((d, i) => (
-              <div key={i} style={styles.rowSmall}>
-                <span>{new Date(d.date).toLocaleDateString()}</span>
-                <span style={styles.value}>{d.amount.toFixed(2)} €</span>
-              </div>
-            ))}
+          <div style={styles.row}>
+            <span>Total BTC</span>
+            <span style={styles.value}>{totalBTC.toFixed(6)} BTC</span>
+          </div>
 
-            <div style={styles.subLabel}>Saídas</div>
-            {withdrawals.length === 0 && (
-              <div style={styles.empty}>Sem saídas registadas</div>
-            )}
-            {withdrawals.map((w, i) => (
-              <div key={i} style={styles.rowSmall}>
-                <span>{new Date(w.date).toLocaleDateString()}</span>
-                <span style={styles.value}>{w.amount.toFixed(2)} €</span>
-              </div>
-            ))}
+          <div style={styles.row}>
+            <span>Valor Atual</span>
+            <span style={styles.value}>{currentValue.toFixed(2)} €</span>
           </div>
         </div>
 
-        {/* COLUNA DIREITA */}
-        <div style={styles.colRight}>
-          {/* ANALISTA INTELIGENTE */}
-          <div style={styles.card}>
-            <div style={styles.label}>Analista Inteligente</div>
+        <div style={styles.card}>
+          <div style={styles.label}>Performance</div>
 
-            <div style={styles.row}>
-              <span>Ação sugerida</span>
-              <span style={{ ...styles.value, color: "#f7931a" }}>
-                {capitalIntel.action} ({capitalIntel.intensity})
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Exposição atual</span>
-              <span style={styles.value}>
-                {capitalIntel.exposureCurrent.toFixed(1)}%
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Exposição ideal</span>
-              <span style={styles.value}>
-                {capitalIntel.exposureIdeal.toFixed(1)}%
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Gap de exposição</span>
-              <span style={styles.value}>
-                {capitalIntel.exposureGap.toFixed(1)}%
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Sugestão de compra</span>
-              <span style={styles.value}>
-                {capitalIntel.suggestedBuy.toFixed(2)} €
-              </span>
-            </div>
-
-            <div style={styles.row}>
-              <span>Sugestão de realização</span>
-              <span style={styles.value}>
-                {capitalIntel.suggestedSell.toFixed(2)} €
-              </span>
-            </div>
-
-            <div style={styles.subLabel}>Resumo</div>
-            <div style={styles.summary}>{capitalIntel.narrative}</div>
+          <div style={styles.row}>
+            <span>PnL</span>
+            <span
+              style={{
+                ...styles.value,
+                color: pnl >= 0 ? "#22c55e" : "#f43f5e",
+              }}
+            >
+              {pnl.toFixed(2)} €
+            </span>
           </div>
 
-          {/* PAINEL DE RISCO / OPORTUNIDADE / LIQUIDEZ */}
-          <div style={styles.card}>
-            <div style={styles.label}>Contexto de Mercado</div>
-
-            <div style={styles.badgeRow}>
-              <div style={styles.badgeBlock}>
-                <div style={styles.badgeLabel}>Risco</div>
-                <div style={styles.badgeValue}>{capitalIntel.riskLevel}</div>
-              </div>
-              <div style={styles.badgeBlock}>
-                <div style={styles.badgeLabel}>Oportunidade</div>
-                <div style={styles.badgeValue}>
-                  {capitalIntel.opportunityLevel}
-                </div>
-              </div>
-              <div style={styles.badgeBlock}>
-                <div style={styles.badgeLabel}>Liquidez</div>
-                <div style={styles.badgeValue}>
-                  {capitalIntel.liquidityLevel}
-                </div>
-              </div>
-            </div>
-
-            <div style={styles.subLabel}>Estado do mercado</div>
-            <div style={styles.summary}>
-              {marketIntel.marketState} ·{" "}
-              {marketIntel.recommendation ?? "neutral"}
-            </div>
+          <div style={styles.row}>
+            <span>PnL %</span>
+            <span
+              style={{
+                ...styles.value,
+                color: pnlPercent >= 0 ? "#22c55e" : "#f43f5e",
+              }}
+            >
+              {pnlPercent.toFixed(2)}%
+            </span>
           </div>
 
-          {/* ALERTAS FINANCEIROS */}
-          <div style={styles.card}>
-            <div style={styles.label}>Alertas Financeiros</div>
-
-            {capitalIntel.alerts.length === 0 && (
-              <div style={styles.empty}>Sem alertas críticos neste momento.</div>
-            )}
-
-            {capitalIntel.alerts.length > 0 && (
-              <ul style={styles.alertList}>
-                {capitalIntel.alerts.map((a, i) => (
-                  <li key={i} style={styles.alertItem}>
-                    {a}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* AÇÕES RÁPIDAS */}
-          <div style={styles.card}>
-            <div style={styles.label}>Ações Rápidas</div>
-
-            <div style={styles.actionsRow}>
-              <button
-                style={styles.buttonPrimary}
-                onClick={() => addFunds(100)}
-              >
-                + Adicionar 100 €
-              </button>
-
-              <button
-                style={styles.buttonSecondary}
-                onClick={() => withdrawFunds(50)}
-              >
-                Levantar 50 €
-              </button>
-            </div>
-
-            <p style={styles.actionsHint}>
-              Usa estas ações para ajustar liquidez e deixar o Capital Engine
-              recalibrar a tua exposição.
-            </p>
+          <div style={styles.row}>
+            <span>Lucro Realizado</span>
+            <span style={styles.value}>{realizedProfit.toFixed(2)} €</span>
           </div>
         </div>
       </div>
+
+      <div style={styles.separator} />
+
+      {/* ANALISTA */}
+      <div style={styles.card}>
+        <div style={styles.label}>Analista Inteligente</div>
+
+        <div style={styles.row}>
+          <span>Ação</span>
+          <span style={{ ...styles.value, color: "#f7931a" }}>
+            {capitalIntel.action}
+          </span>
+        </div>
+
+        <div style={styles.row}>
+          <span>Intensidade</span>
+          <span style={styles.value}>{capitalIntel.intensity}</span>
+        </div>
+
+        <div style={styles.row}>
+          <span>Exposição Atual</span>
+          <span style={styles.value}>
+            {capitalIntel.exposureCurrent.toFixed(1)}%
+          </span>
+        </div>
+
+        <div style={styles.row}>
+          <span>Exposição Ideal</span>
+          <span style={styles.value}>
+            {capitalIntel.exposureIdeal.toFixed(1)}%
+          </span>
+        </div>
+
+        {capitalIntel.suggestedBuy > 0 && (
+          <div style={styles.row}>
+            <span>Comprar</span>
+            <span style={styles.value}>
+              {capitalIntel.suggestedBuy.toFixed(2)} €
+            </span>
+          </div>
+        )}
+
+        {capitalIntel.suggestedSell > 0 && (
+          <div style={styles.row}>
+            <span>Vender</span>
+            <span style={styles.value}>
+              {capitalIntel.suggestedSell.toFixed(2)} €
+            </span>
+          </div>
+        )}
+
+        <div style={styles.subLabel}>Resumo</div>
+        <div style={styles.summary}>{capitalIntel.narrative}</div>
+      </div>
+
+      <div style={styles.separator} />
+
+      {/* ALERTAS */}
+      <div style={styles.card}>
+        <div style={styles.label}>Alertas</div>
+
+        {capitalIntel.alerts.length === 0 && (
+          <div style={styles.empty}>Sem alertas.</div>
+        )}
+
+        {capitalIntel.alerts.map((a, i) => (
+          <div key={i} style={styles.alert}>
+            {a}
+          </div>
+        ))}
+      </div>
+
+      <div style={styles.separator} />
+
+      {/* LISTA DE MOVIMENTOS */}
+      <h2 style={styles.sectionTitle}>Movimentos de Fundos</h2>
+
+      <div style={styles.grid}>
+        <div style={styles.card}>
+          <div style={styles.label}>Entradas</div>
+
+          {deposits.length === 0 && (
+            <div style={styles.empty}>Sem entradas registadas</div>
+          )}
+
+          {deposits.map((d, i) => (
+            <div key={i} style={styles.rowSmall}>
+              <span>{new Date(d.date).toLocaleDateString()}</span>
+              <span style={styles.value}>{d.amount.toFixed(2)} €</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.label}>Saídas</div>
+
+          {withdrawals.length === 0 && (
+            <div style={styles.empty}>Sem saídas registadas</div>
+          )}
+
+          {withdrawals.map((w, i) => (
+            <div key={i} style={styles.rowSmall}>
+              <span>{new Date(w.date).toLocaleDateString()}</span>
+              <span style={styles.value}>{w.amount.toFixed(2)} €</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MODAL */}
+      {modalType && (
+        <FundMovementModal
+          type={modalType}
+          onClose={() => setModalType(null)}
+          onSubmit={(amount, date) => {
+            if (modalType === "deposit") {
+              registerDeposit(amount, date);
+            } else {
+              registerWithdrawal(amount, date);
+
+              // SAÍDA DE FUNDOS = LUCRO REALIZADO
+              portfolio.realizedProfit += amount;
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -323,62 +309,57 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     fontFamily: "Inter, system-ui, sans-serif",
     padding: 32,
-    maxWidth: 1200,
+    maxWidth: 1100,
     margin: "0 auto",
   },
-  header: {
+  topBar: {
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
-    gap: 16,
+    justifyContent: "flex-end",
+    marginBottom: 20,
+  },
+  walletButton: {
+    padding: "10px 16px",
+    background: "#000",
+    border: "1px solid #f7931a",
+    borderRadius: 8,
+    color: "#f7931a",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: 15,
+  },
+  fundMenu: {
+    position: "absolute",
+    top: "110%",
+    right: 0,
+    background: "#000",
+    border: "1px solid #f7931a",
+    borderRadius: 8,
+    padding: 6,
+    width: 180,
+    zIndex: 10,
+  },
+  fundMenuItem: {
+    padding: "10px 12px",
+    color: "#fff",
+    cursor: "pointer",
+    borderRadius: 6,
+    fontSize: 14,
   },
   title: {
     fontSize: 28,
-    marginBottom: 6,
+    marginBottom: 24,
     fontWeight: 600,
   },
-  subtitle: {
-    fontSize: 14,
-    color: "#aaa",
-    maxWidth: 520,
-  },
-  headerBadge: {
-    padding: "10px 16px",
-    borderRadius: 999,
-    border: "1px solid #f7931a55",
-    background: "#0b0b0b",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: 2,
-  },
-  headerBadgeLabel: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    color: "#aaa",
-  },
-  headerBadgeValue: {
-    fontSize: 13,
+  sectionTitle: {
+    fontSize: 22,
+    marginBottom: 16,
     fontWeight: 600,
     color: "#f7931a",
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 1.1fr)",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
     gap: 20,
-    alignItems: "flex-start",
-  },
-  colLeft: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  },
-  colRight: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
   },
   card: {
     background: "#0b0b0b",
@@ -393,7 +374,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   subLabel: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#aaa",
     marginTop: 12,
     marginBottom: 6,
@@ -401,15 +382,15 @@ const styles: Record<string, React.CSSProperties> = {
   row: {
     display: "flex",
     justifyContent: "space-between",
-    marginBottom: 8,
-    fontSize: 14,
+    marginBottom: 10,
+    fontSize: 15,
   },
   rowSmall: {
     display: "flex",
     justifyContent: "space-between",
     marginBottom: 6,
-    fontSize: 13,
-    opacity: 0.9,
+    fontSize: 14,
+    opacity: 0.85,
   },
   value: {
     fontWeight: 600,
@@ -417,100 +398,23 @@ const styles: Record<string, React.CSSProperties> = {
   empty: {
     fontSize: 13,
     color: "#666",
-    marginTop: 4,
+  },
+  separator: {
+    borderTop: "1px solid #f7931a33",
+    margin: "24px 0",
   },
   summary: {
     fontSize: 14,
     color: "#ddd",
     lineHeight: 1.5,
   },
-  separator: {
-    borderTop: "1px solid #f7931a55",
-    margin: "16px 0",
-  },
-  cardHeaderRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  chip: {
-    fontSize: 11,
-    padding: "4px 10px",
-    borderRadius: 999,
-    border: "1px solid #333",
-    color: "#ddd",
-    background: "#111",
-  },
-  badgeRow: {
-    display: "flex",
-    gap: 10,
-    marginBottom: 8,
-  },
-  badgeBlock: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 10,
-    background: "#111",
-    border: "1px solid #222",
-  },
-  badgeLabel: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    color: "#888",
-    marginBottom: 4,
-  },
-  badgeValue: {
-    fontSize: 14,
-    fontWeight: 600,
-  },
-  alertList: {
-    listStyle: "none",
-    paddingLeft: 0,
-    margin: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
-  alertItem: {
-    fontSize: 13,
-    color: "#f97316",
+  alert: {
     background: "#1a1205",
+    border: "1px solid #f7931a55",
+    padding: "8px 12px",
     borderRadius: 8,
-    padding: "6px 10px",
-    border: "1px solid #f9731633",
-  },
-  actionsRow: {
-    display: "flex",
-    gap: 10,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  buttonPrimary: {
-    padding: "10px 16px",
-    background: "#f7931a",
-    border: "none",
-    borderRadius: 8,
-    color: "#000",
-    fontWeight: 700,
-    cursor: "pointer",
+    marginBottom: 6,
     fontSize: 14,
-  },
-  buttonSecondary: {
-    padding: "10px 16px",
-    background: "#111",
-    borderRadius: 8,
-    border: "1px solid #333",
-    color: "#fff",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontSize: 14,
-  },
-  actionsHint: {
-    fontSize: 12,
-    color: "#777",
-    marginTop: 4,
   },
 };
-                                                                          
+                          
