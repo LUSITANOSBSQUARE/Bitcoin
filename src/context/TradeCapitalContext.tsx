@@ -10,22 +10,30 @@ import type { Trade } from "./TradesContext";
    TIPOS
 --------------------------------------------- */
 
+export type MonthAuditEntry = {
+  id: string;
+  date: string;      // ISO
+  message: string;
+};
+
 export type TradeCapitalMonth = {
   monthIndex: number;      // 0-11
   monthName: string;       // "Janeiro"
-  bancaInicial: number;    // banca no início do mês
-  bancaFinal: number;      // banca no fim do mês
-  pnlUSDT: number;         // lucro/perda do mês em USDT
-  pnlPercent: number;      // % sobre bancaInicial
-  targetPercent: number;   // alvo mensal em %
-  targetUSDT: number;      // alvo mensal em USDT
-  aporte: number;          // entradas de capital
-  withdraw: number;        // saídas de capital
-  reserve: number;         // reserva no fim do mês
-  btc: number;             // BTC acumulado no fim do mês
-  fees: number;            // taxas (se quiseres usar)
-  trades: number;          // nº trades
-  winrate: number;         // % trades vencedoras
+  bancaInicial: number;
+  bancaFinal: number;
+  pnlUSDT: number;
+  pnlPercent: number;
+  targetPercent: number;
+  targetUSDT: number;
+  aporte: number;
+  withdraw: number;
+  reserve: number;
+  btc: number;
+  fees: number;
+  trades: number;
+  winrate: number;
+  notes?: string;
+  auditLog?: MonthAuditEntry[];
 };
 
 export type TradeCapitalYear = {
@@ -42,20 +50,27 @@ export type TradeCapitalYear = {
 };
 
 type TradeCapitalContextType = {
-  capital: number;              // banca atual
-  reserve: number;              // reserva atual
-  btcAccumulated: number;       // BTC acumulado
-  profitReservePercent: number; // % dos lucros para reserva
+  capital: number;
+  reserve: number;
+  btcAccumulated: number;
+  profitReservePercent: number;
 
   years: TradeCapitalYear[];
   currentYear: TradeCapitalYear | null;
-  months: TradeCapitalMonth[];  // meses do ano atual
+  months: TradeCapitalMonth[];
 
   registerClosedTrade: (trade: Trade, pnl: number, isWin?: boolean) => void;
   addAporte: (value: number) => void;
   removeCapital: (value: number) => void;
   buyBTC: (value: number, btcPrice: number) => void;
   setProfitReservePercent: (p: number) => void;
+
+  updateMonth: (
+    year: number,
+    monthIndex: number,
+    patch: Partial<TradeCapitalMonth>,
+    auditMessage?: string
+  ) => void;
 };
 
 const STORAGE_KEY = "btc_engine_trade_capital_v2";
@@ -71,7 +86,7 @@ export const TradeCapitalProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [capital, setCapital] = useState(0); // ⭐ começa a ZERO
+  const [capital, setCapital] = useState(0);
   const [reserve, setReserve] = useState(0);
   const [btcAccumulated, setBtcAccumulated] = useState(0);
   const [profitReservePercent, setProfitReservePercent] = useState(30);
@@ -79,9 +94,7 @@ export const TradeCapitalProvider = ({
 
   const currentYearNumber = new Date().getFullYear();
 
-  /* ---------------------------------------------
-     LOAD LOCALSTORAGE
-  --------------------------------------------- */
+  /* LOAD */
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -94,9 +107,7 @@ export const TradeCapitalProvider = ({
     setYears(data.years ?? []);
   }, []);
 
-  /* ---------------------------------------------
-     SAVE LOCALSTORAGE
-  --------------------------------------------- */
+  /* SAVE */
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
@@ -110,9 +121,7 @@ export const TradeCapitalProvider = ({
     );
   }, [capital, reserve, btcAccumulated, profitReservePercent, years]);
 
-  /* ---------------------------------------------
-     HELPERS
-  --------------------------------------------- */
+  /* HELPERS */
 
   const getOrCreateYear = (
     prev: TradeCapitalYear[],
@@ -174,9 +183,8 @@ export const TradeCapitalProvider = ({
     };
   };
 
-  /* ---------------------------------------------
-     REGISTAR TRADE FECHADA
---------------------------------------------- */
+  /* REGISTAR TRADE FECHADA */
+
   const registerClosedTrade = (
     trade: Trade,
     pnl: number,
@@ -204,15 +212,18 @@ export const TradeCapitalProvider = ({
           let month = months.find((m) => m.monthIndex === monthIndex);
 
           if (!month) {
+            const pnlPercent =
+              oldCapital > 0 ? (pnl / oldCapital) * 100 : 0;
+
             month = {
               monthIndex,
               monthName,
               bancaInicial: oldCapital,
               bancaFinal: newCapital,
               pnlUSDT: pnl,
-              pnlPercent: 0,
+              pnlPercent,
               targetPercent: -6,
-              targetUSDT: 0,
+              targetUSDT: ( -6 / 100 ) * oldCapital,
               aporte: 0,
               withdraw: 0,
               reserve: reserve + reserveAdd,
@@ -220,6 +231,8 @@ export const TradeCapitalProvider = ({
               fees: 0,
               trades: 1,
               winrate: isWin ? 100 : 0,
+              notes: "",
+              auditLog: [],
             };
             months.push(month);
           } else {
@@ -262,9 +275,8 @@ export const TradeCapitalProvider = ({
     });
   };
 
-  /* ---------------------------------------------
-     APORTES (ENTRADAS)
---------------------------------------------- */
+  /* APORTES */
+
   const addAporte = (value: number) => {
     if (value <= 0) return;
 
@@ -293,7 +305,7 @@ export const TradeCapitalProvider = ({
               pnlUSDT: 0,
               pnlPercent: 0,
               targetPercent: -6,
-              targetUSDT: 0,
+              targetUSDT: ( -6 / 100 ) * oldCapital,
               aporte: value,
               withdraw: 0,
               reserve,
@@ -301,6 +313,8 @@ export const TradeCapitalProvider = ({
               fees: 0,
               trades: 0,
               winrate: 0,
+              notes: "",
+              auditLog: [],
             };
             months.push(month);
           } else {
@@ -325,9 +339,8 @@ export const TradeCapitalProvider = ({
     });
   };
 
-  /* ---------------------------------------------
-     SAÍDAS (WITHDRAW)
---------------------------------------------- */
+  /* SAÍDAS */
+
   const removeCapital = (value: number) => {
     if (value <= 0) return;
 
@@ -356,7 +369,7 @@ export const TradeCapitalProvider = ({
               pnlUSDT: 0,
               pnlPercent: 0,
               targetPercent: -6,
-              targetUSDT: 0,
+              targetUSDT: ( -6 / 100 ) * oldCapital,
               aporte: 0,
               withdraw: value,
               reserve,
@@ -364,6 +377,8 @@ export const TradeCapitalProvider = ({
               fees: 0,
               trades: 0,
               winrate: 0,
+              notes: "",
+              auditLog: [],
             };
             months.push(month);
           } else {
@@ -388,9 +403,8 @@ export const TradeCapitalProvider = ({
     });
   };
 
-  /* ---------------------------------------------
-     COMPRA DE BTC COM RESERVA
---------------------------------------------- */
+  /* COMPRA BTC */
+
   const buyBTC = (value: number, btcPrice: number) => {
     if (value <= 0) return;
     if (value > reserve) return;
@@ -400,13 +414,59 @@ export const TradeCapitalProvider = ({
 
     setReserve((r) => r - value);
     setBtcAccumulated((b) => b + btc);
-
-    // opcionalmente poderias registar isto no mês atual
   };
 
-  /* ---------------------------------------------
-     DERIVADOS
---------------------------------------------- */
+  /* UPDATE MONTH (EDIÇÃO MANUAL) */
+
+  const updateMonth = (
+    yearNum: number,
+    monthIndex: number,
+    patch: Partial<TradeCapitalMonth>,
+    auditMessage?: string
+  ) => {
+    setYears((prev) =>
+      prev.map((year) => {
+        if (year.year !== yearNum) return year;
+
+        const months = year.months.map((m) => {
+          if (m.monthIndex !== monthIndex) return m;
+
+          const updated: TradeCapitalMonth = {
+            ...m,
+            ...patch,
+          };
+
+          // recalcular derivados básicos
+          const pnlUSDT = updated.pnlUSDT;
+          const bancaInicial = updated.bancaInicial;
+          updated.pnlPercent =
+            bancaInicial > 0 ? (pnlUSDT / bancaInicial) * 100 : 0;
+          updated.targetUSDT =
+            (updated.targetPercent / 100) * bancaInicial;
+
+          // audit log
+          const logEntry: MonthAuditEntry | null = auditMessage
+            ? {
+                id: crypto.randomUUID(),
+                date: new Date().toISOString(),
+                message: auditMessage,
+              }
+            : null;
+
+          return {
+            ...updated,
+            auditLog: logEntry
+              ? [...(updated.auditLog ?? []), logEntry]
+              : updated.auditLog,
+          };
+        });
+
+        return recalcYear({ ...year, months });
+      })
+    );
+  };
+
+  /* DERIVADOS */
 
   const currentYear =
     years.find((y) => y.year === currentYearNumber) ?? null;
@@ -428,16 +488,13 @@ export const TradeCapitalProvider = ({
         removeCapital,
         buyBTC,
         setProfitReservePercent,
+        updateMonth,
       }}
     >
       {children}
     </TradeCapitalContext.Provider>
   );
 };
-
-/* ---------------------------------------------
-   HOOK
---------------------------------------------- */
 
 export const useTradeCapital = () => {
   const ctx = useContext(TradeCapitalContext);
