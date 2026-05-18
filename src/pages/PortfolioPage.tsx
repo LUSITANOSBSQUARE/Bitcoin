@@ -215,21 +215,26 @@ export const PortfolioPage = () => {
 
       {/* MODAL */}
       {showModal && (
-        <TransactionFormModal
-          onClose={() => setShowModal(false)}
-          onSubmit={(tx) => {
-            addEntry({
-              id: crypto.randomUUID(),
-              type: tx.type,
-              date: tx.date,
-              amountBTC: tx.amountBTC,
-              amountEUR: tx.amountEUR,
-              priceEUR: tx.priceEUR,
-            });
-            setShowModal(false);
-          }}
-        />
-      )}
+  <TransactionFormModal
+    onClose={() => setShowModal(false)}
+    onSubmit={async (tx) => {
+      await addEntry({
+        id: crypto.randomUUID(),
+        type: tx.type,
+        date: tx.date, // já vem YYYY-MM-DD
+        amountBTC: tx.amountBTC,
+        amountEUR: tx.amountEUR,
+        priceEUR: tx.priceEUR,
+        meta: {
+          source: "manual",
+        },
+      });
+
+      setShowModal(false);
+    }}
+  />
+)}
+
 
       <div style={styles.cardGrid}>
         <Card label="Total BTC" value={`${totalBTC.toFixed(8)} BTC`} />

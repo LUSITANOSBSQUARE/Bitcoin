@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext } from "react";
+import { useLedgerSupabase } from "../hooks/useLedgerSupabase";
+
+/* ---------------- TYPES (mantidos aqui para não quebrar nada) ---------------- */
 
 export type LedgerEntryType =
   | "DEPOSIT"
@@ -17,62 +20,39 @@ export interface LedgerEntry {
   priceEUR?: number;
   date: string;
   meta?: Record<string, any>;
+  created_at?: string;
 }
+
+/* ---------------- CONTEXT INTERFACE ---------------- */
 
 interface LedgerContextType {
   entries: LedgerEntry[];
-  addEntry: (entry: LedgerEntry) => void;
-  removeEntry: (id: string) => void;
-  clearLedger: () => void;
+  loading: boolean;
+  addEntry: (entry: LedgerEntry) => Promise<void>;
+  removeEntry: (id: string) => Promise<void>;
+  clearLedger: () => Promise<void>;
 }
 
-const STORAGE_KEY = "btc_engine_ledger";
+/* ---------------- CONTEXT ---------------- */
 
 const LedgerContext = createContext<LedgerContextType | null>(null);
 
 export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [entries, setEntries] = useState<LedgerEntry[]>([]);
-
-  /* ---------------- LOAD FROM LOCALSTORAGE ---------------- */
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setEntries(parsed);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar Ledger:", err);
-    }
-  }, []);
-
-  /* ---------------- SAVE TO LOCALSTORAGE ---------------- */
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    } catch (err) {
-      console.error("Erro ao guardar Ledger:", err);
-    }
-  }, [entries]);
-
-  /* ---------------- CRUD ---------------- */
-
-  const addEntry = (entry: LedgerEntry) => {
-    setEntries((prev) => [...prev, entry]);
-  };
-
-  const removeEntry = (id: string) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-  };
-
-  const clearLedger = () => {
-    setEntries([]);
-  };
+  const { entries, loading, addEntry, removeEntry, clearLedger } =
+    useLedgerSupabase();
 
   return (
-    <LedgerContext.Provider value={{ entries, addEntry, removeEntry, clearLedger }}>
+    <LedgerContext.Provider
+      value={{
+        entries,
+        loading,
+        addEntry,
+        removeEntry,
+        clearLedger,
+      }}
+    >
       {children}
     </LedgerContext.Provider>
   );
